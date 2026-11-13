@@ -1,6 +1,6 @@
 'use strict';
 /* =========================================================
-   aba. — telas
+   Dedé — telas: Atividades · Equipe · Métricas
    ========================================================= */
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -12,784 +12,253 @@ const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const WDL = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const MESL = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-
-const fmtPts = n => (Math.round(n * 10) / 10).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+const fmtPts = n => (Math.round(n * 100) / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 const fmtNum = (n, d = 1) => n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtBRL = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDur = min => { min = Math.max(0, Math.round(min)); const h = Math.floor(min / 60), m = min % 60; return h ? `${h}h${pad(m)}` : `${m}min`; };
-const fmtMult = m => `×${fmtNum(m, m % 1 ? (Math.round(m * 100) % 10 ? 2 : 1) : 1)}`;
+const fmtMult = m => `×${fmtNum(m, Math.round(m * 100) % 10 ? 2 : 1)}`;
+const fmtDay = k => { const d = parseKey(k); return `${WD[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
+const parseHM = v => { v = String(v || '').trim().replace(',', '.'); if (!v) return 0; if (v.includes(':') || v.includes('h')) { const [h, m] = v.split(/[:h]/); return (+h || 0) * 60 + (+m || 0); } return Math.round(parseFloat(v) * 60) || 0; };
+const toHM = min => min ? `${Math.floor(min / 60)}:${pad(Math.round(min % 60))}` : '';
+
+const STATUS = {
+  pendente: { label: 'Aguardando', cls: 'st-pend' },
+  aprovada: { label: 'Aprovada', cls: 'st-ok' },
+  erro: { label: 'Erro apontado', cls: 'st-err' },
+  recusada: { label: 'Recusada', cls: 'st-no' },
+};
 
 const ui = {
-  view: 'designers',
-  sheet: { who: 'all', q: '', sort: 't', dir: -1, closed: {}, limit: {} },
-  period: 'semana',
-  meId: localStorage.getItem('aba.me') || 'adm',
+  view: 'atividades',
+  meId: localStorage.getItem('dede.me') || 'adm',
+  period: 'dia',
   day: new Date(),
-  cardTab: 'fazendo',
-  cardWho: 'me',
+  who: 'all',
+  status: 'todas',
   q: '',
-  shownDone: 40,
-  rotation: 'noite',
-  sim: null,
+  closed: {},
 };
+const me = () => person(ui.meId) || S.people.find(p => p.role === 'admin');
+const isAdmin = () => me().role === 'admin';
+const avatar = (p, size = '') => p ? `<span class="av ${size}" style="--pc:${p.color}" title="${esc(p.name)}">${esc(initials(p.name))}</span>` : '';
+
 const I = {
-  designers: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
-  sheet: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
-  painel: '<path d="M3 13h8V3H3z"/><path d="M13 21h8V11h-8z"/><path d="M13 3v6h8V3z"/><path d="M3 21h8v-6H3z"/>',
-  cards: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
-  turno: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  pontos: '<path d="M12 2l2.9 6.26 6.6.74-4.9 4.6 1.3 6.6L12 17l-5.9 3.2 1.3-6.6L2.5 9l6.6-.74z"/>',
+  atividades: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
   equipe: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  metricas: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
-  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
-  down: '<path d="M12 4v12M6 12l6 6 6-6"/><path d="M4 21h16"/>',
-  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
-  bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
-  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  sheet: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
+  star: '<path d="M12 2l2.9 6.26 6.6.74-4.9 4.6 1.3 6.6L12 17l-5.9 3.2 1.3-6.6L2.5 9l6.6-.74z"/>',
+  left: '<path d="M15 18l-6-6 6-6"/>',
+  right: '<path d="M9 18l6-6-6-6"/>',
 };
 const ico = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n] || ''}</svg>`;
-/* medidor de barrinhas (estilo "uso") */
-const ticks = (frac, n = 28) => { const on = Math.round(Math.max(0, Math.min(1, frac)) * n); return `<div class="ticks" style="--n:${n}">${Array.from({ length: n }, (_, i) => `<i class="${i < on ? 'on' : ''}"></i>`).join('')}</div>`; };
-const me = () => person(ui.meId) || S.people.find(p => p.role === 'admin') || S.people[0];
-const isAdmin = () => me() && me().role === 'admin';
-const avatar = (p, size = '') => p ? `<span class="av ${size}" style="--pc:${p.color}" title="${esc(p.name)}">${esc(initials(p.name))}</span>` : `<span class="av ${size} ghost-av">?</span>`;
 
 /* ---------- período ---------- */
-function periodRange() {
-  const now = new Date(), t = startOfDay(now);
-  switch (ui.period) {
-    case 'hoje': return { from: t, to: now, label: `hoje, ${t.getDate()} de ${MESL[t.getMonth()]}` };
-    case 'mes': return { from: new Date(t.getFullYear(), t.getMonth(), 1), to: now, label: MESL[t.getMonth()] };
-    case 'mes_ant': { const a = new Date(t.getFullYear(), t.getMonth() - 1, 1); return { from: a, to: new Date(t.getFullYear(), t.getMonth(), 1), label: `${MESL[a.getMonth()]} (fechado)` }; }
-    default: { const w = startOfWeek(t); return { from: w, to: now, label: `semana de ${w.getDate()} ${MES[w.getMonth()]}` }; }
-  }
+function period() {
+  const d = startOfDay(ui.day);
+  if (ui.period === 'semana') { const a = startOfWeek(d), b = addDays(a, 6); return { from: dkey(a), to: dkey(b), label: `semana de ${a.getDate()} ${MES[a.getMonth()]} a ${b.getDate()} ${MES[b.getMonth()]}` }; }
+  if (ui.period === 'mes') { const a = new Date(d.getFullYear(), d.getMonth(), 1), b = new Date(d.getFullYear(), d.getMonth() + 1, 0); return { from: dkey(a), to: dkey(b), label: `${MESL[d.getMonth()]} de ${d.getFullYear()}` }; }
+  return { from: dkey(d), to: dkey(d), label: `${WDL[d.getDay()]}, ${d.getDate()} de ${MESL[d.getMonth()]}` };
 }
-function periodTabs() {
-  const keep = ui.period, out = [];
-  for (const [v, l] of [['hoje', 'Hoje'], ['semana', 'Semana'], ['mes', 'Mês'], ['mes_ant', 'Mês passado']]) {
-    ui.period = v; const { from, to } = periodRange();
-    const pts = designers().filter(p => isAdmin() || p.id === me().id).reduce((t, p) => t + stats(p.id, from, to).points, 0);
-    out.push(`<button class="tab-pill ${keep === v ? 'on' : ''}" data-period="${v}">${ico('cal')}<span>${l}</span><b>${fmtPts(pts)}</b></button>`);
-  }
-  ui.period = keep;
-  return `<div class="tab-row">${out.join('')}</div>`;
+function shiftPeriod(n) {
+  if (!n) { ui.day = new Date(); return; }
+  if (ui.period === 'semana') ui.day = addDays(ui.day, 7 * n);
+  else if (ui.period === 'mes') ui.day = new Date(ui.day.getFullYear(), ui.day.getMonth() + n, 1);
+  else ui.day = addDays(ui.day, n);
 }
-function meterCard() {
-  const m = me(), ds = designers();
-  if (isAdmin()) {
-    const on = ds.filter(p => isOnlineNow(p.id)).length;
-    return `<div class="meter-card"><span class="mc-ico">${ico('bolt')}</span><div class="mc-t"><b>Time online agora</b><span>${on} de ${ds.length} designers</span></div>${ticks(ds.length ? on / ds.length : 0, 30)}</div>`;
-  }
-  const today = startOfDay(new Date());
-  const min = minutesOnline(m.id, today, new Date());
-  const top = [...S.settings.tiers].sort((a, b) => b.h - a.h)[0] || { h: 10, mult: 1 };
-  const left = top.h * 60 - min;
-  return `<div class="meter-card"><span class="mc-ico">${ico('bolt')}</span><div class="mc-t"><b>Hoje · ${fmtDur(min)} online</b><span>${left > 0 ? `faltam ${fmtDur(left)} para ${fmtMult(top.mult)}` : `bônus máximo ${fmtMult(top.mult)}`}</span></div>${ticks(min / (top.h * 60), 30)}</div>`;
-}
-function nightBanner() {
-  const now = new Date(), k = dkey(now);
-  const ppl = [...new Set(NIGHT().flatMap(h => shiftIds(k, h)))].map(person).filter(Boolean);
-  const txt = ppl.length ? `${ppl.map(p => firstName(p.name)).join(' e ')} ${ppl.length > 1 ? 'ficam' : 'fica'} até as ${H().nightEnd}h` : 'Ninguém escalado ainda';
-  return `<button class="banner" data-go="turno"><span class="b-sky"></span><span class="b-txt"><b>Escala de hoje à noite</b><span>${esc(txt)}</span></span><span class="b-av">${ppl.map(p => avatar(p, 'sm')).join('')}</span></button>`;
-}
-const periodSeg = () => `<div class="seg period">${[['hoje', 'hoje'], ['semana', 'semana'], ['mes', 'mês'], ['mes_ant', 'mês passado']].map(([v, l]) => `<button data-period="${v}" class="${ui.period === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+const periodCtl = () => `<div class="period-ctl">
+  <div class="seg">${[['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']].map(([v, l]) => `<button data-period="${v}" class="${ui.period === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <button class="icon" data-shift="-1" aria-label="anterior">${ico('left')}</button>
+  <button class="ghost sm" data-shift="0">hoje</button>
+  <button class="icon" data-shift="1" aria-label="próximo">${ico('right')}</button>
+</div>`;
 
 /* ---------- shell ---------- */
 function render() {
   if (!person(ui.meId)) ui.meId = me().id;
-  const items = [['designers', 'Designers'], ['painel', 'Painel'], ['cards', 'Cards'], ['turno', 'Turno'], ['pontos', 'Pontuação']];
-  if (isAdmin()) items.push(['equipe', 'Equipe']);
-  if (!items.some(i => i[0] === ui.view)) ui.view = 'painel';
-  $('#nav').innerHTML = items.map(([v, l]) => `<button data-view="${v}" class="${ui.view === v ? 'on' : ''}" title="${l}" aria-label="${l}">${ico(v)}${v === 'cards' ? badgeQueue() : ''}<span class="tip">${l}</span></button>`).join('');
-  $('#title').innerHTML = titleFor(Object.fromEntries(items)[ui.view] || '');
+  const items = [['atividades', 'Atividades']];
+  if (isAdmin()) items.push(['equipe', 'Equipe'], ['metricas', 'Métricas']);
+  if (!items.some(i => i[0] === ui.view)) ui.view = 'atividades';
+  const pend = S.activities.filter(a => a.status === 'pendente').length;
+  $('#nav').innerHTML = items.map(([v, l]) => `<button data-view="${v}" class="${ui.view === v ? 'on' : ''}" aria-label="${l}">${ico(v)}${v === 'atividades' && isAdmin() && pend ? `<i class="nav-badge">${pend > 99 ? '99+' : pend}</i>` : ''}<span class="lbl">${l}</span></button>`).join('');
+  const sub = ui.view === 'equipe' ? `${designers().length} designer${designers().length === 1 ? '' : 's'}` : period().label;
+  $('#title').innerHTML = `<span>${Object.fromEntries(items)[ui.view]}</span><i class="sep"></i><span class="sub">${esc(sub)}</span>`;
   renderMe();
   document.body.dataset.view = ui.view;
-  document.body.classList.toggle('is-admin', isAdmin());
-  const v = { designers: viewDesigners, painel: viewPainel, cards: viewCards, turno: viewTurno, pontos: viewPontos, equipe: viewEquipe }[ui.view];
-  $('#main').innerHTML = v();
-  tick();
-}
-function titleFor(label) {
-  let sub = '';
-  if (ui.view === 'painel' || ui.view === 'designers') sub = periodRange().label;
-  else if (ui.view === 'cards') sub = `${S.cards.filter(c => c.status === 'fazendo').length} em andamento`;
-  else if (ui.view === 'turno') sub = `${WDL[ui.day.getDay()]}, ${ui.day.getDate()} de ${MESL[ui.day.getMonth()]}`;
-  else if (ui.view === 'pontos') sub = `${S.settings.itemTypes.length} tipos de tarefa`;
-  else if (ui.view === 'equipe') sub = `${S.people.length} pessoas`;
-  return `<span>${label}</span><i class="sep"></i><span class="sub">${esc(sub)}</span>`;
-}
-function badgeQueue() {
-  const n = S.cards.filter(c => c.status === 'fila').length;
-  return n ? `<i class="nav-badge">${n}</i>` : '';
+  $('#main').innerHTML = ({ atividades: viewAtividades, equipe: viewEquipe, metricas: viewMetricas })[ui.view]();
 }
 function renderMe() {
   const m = me();
-  const opts = `<optgroup label="Admin">${S.people.filter(p => p.role === 'admin').map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</optgroup>
-    <optgroup label="Designers">${designers().map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)} · ${p.regime}</option>`).join('')}</optgroup>`;
-  let status = '';
-  if (m.role === 'designer') {
-    const s = openSession(m.id);
-    status = s
-      ? `<button class="online-btn on" data-online-self="off" title="Clique para ficar offline"><i class="dot"></i>online <span class="mono" data-since="${s.start}"></span><em>sair</em></button>`
-      : `<button class="online-btn" data-online-self="on"><i class="dot"></i>ficar online</button>`;
-  } else {
-    const n = designers().filter(p => isOnlineNow(p.id)).length;
-    status = `<span class="online-count"><i class="dot"></i>${n} de ${designers().length} online</span>`;
-  }
-  $('#me').innerHTML = `${status}<label class="whoami" title="Modo demonstração: troque de usuário para ver como cada um enxerga">${avatar(m, 'sm')}<select id="meSel" aria-label="Entrar como">${opts}</select></label>`;
+  const opts = `<optgroup label="Admin">${S.people.filter(p => p.role === 'admin').map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</optgroup>` +
+    (designers().length ? `<optgroup label="Designers">${designers().map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)} · ${p.regime}</option>`).join('')}</optgroup>` : '');
+  $('#me').innerHTML = `<span class="role-tag ${isAdmin() ? 'adm' : ''}">${isAdmin() ? 'admin' : 'designer'}</span><label class="whoami" title="Modo demonstração: troque de usuário para ver como cada um enxerga">${avatar(m, 'sm')}<select id="meSel" aria-label="Entrar como">${opts}</select></label>`;
 }
 
 /* ============================================================
-   DESIGNERS — planilha por designer + métricas da gestão
+   ATIVIDADES
    ============================================================ */
-function activityRows(pid, from, to) {
-  const map = new Map();
-  for (const c of S.cards) {
-    if (c.designerId !== pid) continue;
-    for (const e of c.entries) {
-      if (e.status !== 'feito' || !e.at) continue;
-      const t = new Date(e.at); if (t < from || t >= to) continue;
-      const key = c.id + '|' + e.type + '|' + Math.floor(t / 60000);
-      let r = map.get(key);
-      if (!r) map.set(key, (r = { card: c, type: e.type, t, qty: 0, pts: 0, round: e.round || 1 }));
-      r.qty++; r.pts += typeOf(e.type).pts;
-    }
-  }
-  return [...map.values()];
-}
-function sheetFilter(rows) {
-  const q = ui.sheet.q.trim().toLowerCase();
-  if (q) rows = rows.filter(r => `${r.card.client} ${r.card.luluId || ''} ${r.card.model} ${typeOf(r.type).label}`.toLowerCase().includes(q));
-  const k = ui.sheet.sort, d = ui.sheet.dir;
-  const key = { t: r => +r.t, client: r => r.card.client.toLowerCase(), type: r => typeOf(r.type).label, pts: r => r.pts }[k] || (r => +r.t);
-  return rows.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * d || (b.t - a.t); });
-}
-const sheetPeople = () => isAdmin() ? (ui.sheet.who === 'all' ? designers() : [person(ui.sheet.who)].filter(Boolean)) : [me()];
-const fmtDay = t => `${WD[t.getDay()]} ${pad(t.getDate())}/${pad(t.getMonth() + 1)}`;
-
-function viewDesigners() {
-  const { from, to, label } = periodRange(), admin = isAdmin();
-  const all = designers().map(p => ({ p, s: stats(p.id, from, to) }));
-  const ppl = sheetPeople();
-  let grand = { n: 0, pts: 0, val: 0 }, rowNo = 0;
-
-  const blocks = ppl.map(p => {
-    const s = stats(p.id, from, to);
-    const rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
-    const rows = sheetFilter(activityRows(p.id, from, to));
-    const pts = rows.reduce((a, r) => a + r.pts, 0), val = rate == null ? null : pts * rate;
-    grand.n += rows.length; grand.pts += pts; grand.val += val || 0;
-    const closed = !!ui.sheet.closed[p.id];
-    const lim = ui.sheet.limit[p.id] || 40;
-    let lastDay = '';
-    const body = rows.slice(0, lim).map(r => {
-      const day = dkey(r.t), newDay = day !== lastDay && ui.sheet.sort === 't'; lastDay = day;
-      const t = typeOf(r.type);
-      return `<tr class="${newDay ? 'newday' : ''}">
-        <td class="rn">${++rowNo}</td>
-        <td class="c-date">${fmtDay(r.t)}</td>
-        <td class="c-time">${hm(r.t)}</td>
-        <td class="c-client"><b>${esc(r.card.client)}</b><small>${r.card.luluId ? `lulu #${esc(r.card.luluId)}` : 'manual'}${r.card.model ? ' · ' + esc(r.card.model) : ''}</small></td>
-        <td class="c-act"><span class="act" style="--tc:${t.color}"><i></i>${esc(t.label)}</span>${r.qty > 1 ? `<em>×${r.qty}</em>` : ''}${r.round > 1 ? `<small>${r.round}ª entrega</small>` : ''}</td>
-        <td class="num">${fmtPts(r.pts)}</td>
-        <td class="num money">${rate == null ? '<span class="muted">—</span>' : fmtBRL(r.pts * rate)}</td>
-      </tr>`;
-    }).join('');
-    const sortBtn = (k, l, cls = '') => `<th class="${cls}"><button data-sort="${k}" class="${ui.sheet.sort === k ? 'on' : ''}">${l}${ui.sheet.sort === k ? (ui.sheet.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`;
-    return `<section class="sheet-block" style="--pc:${p.color}">
-      <header class="sb-head" data-toggle-group="${p.id}">
-        ${avatar(p)}
-        <div class="sb-name"><b>${esc(p.name)}</b><span>${p.regime}${isOnlineNow(p.id) ? ' · <i class="on-dot"></i>online agora' : ''}</span></div>
-        <div class="sb-stats">
-          <span><small>clientes</small><b>${new Set(rows.map(r => r.card.id)).size}</b></span>
-          <span><small>atividades</small><b>${rows.length}</b></span>
-          <span><small>pontos</small><b>${fmtPts(pts)}</b></span>
-          <span><small>online</small><b>${fmtDur(s.minutes)}</b></span>
-          <span><small>bônus</small><b>${fmtMult(s.mult)}</b></span>
-          <span class="sb-pay"><small>valor</small><b>${val == null ? 'fixo' : fmtBRL(val)}</b></span>
-        </div>
-        <span class="sb-chev ${closed ? '' : 'open'}">⌄</span>
-      </header>
-      ${closed ? '' : `<div class="sheet-wrap"><table class="sheet">
-        <thead><tr><th class="rn">#</th>${sortBtn('t', 'Data')}<th>Hora</th>${sortBtn('client', 'Card (cliente)')}${sortBtn('type', 'Atividade')}${sortBtn('pts', 'Pontos', 'num')}<th class="num">Valor</th></tr></thead>
-        <tbody>${body || `<tr><td colspan="7" class="empty-row">Nenhuma atividade ${ui.sheet.q ? 'com essa busca' : 'no período'}.</td></tr>`}</tbody>
-        ${rows.length ? `<tfoot><tr><td></td><td colspan="4">Total de ${esc(firstName(p.name))} · ${rows.length} atividades${rate != null ? ` · ponto a ${fmtBRL(rate)} (${fmtBRL(S.settings.pointValue)} × ${fmtNum(s.mult, 2)})` : ''}</td><td class="num">${fmtPts(pts)}</td><td class="num money">${val == null ? '—' : fmtBRL(val)}</td></tr></tfoot>` : ''}
-      </table></div>
-      ${rows.length > lim ? `<div class="sheet-more"><button class="ghost sm" data-more-rows="${p.id}">mostrar mais ${Math.min(100, rows.length - lim)} de ${rows.length - lim} restantes</button></div>` : ''}`}
-    </section>`;
-  }).join('');
-
-  const whoSel = admin ? `<select class="pill-select" data-sheet-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.sheet.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>` : '';
-
-  return `<section class="page">
-    <div class="page-head">
-      <button class="solid big" data-export-csv>${ico('sheet')}Exportar planilha</button><span class="vsep"></span>
-      ${periodTabs()}
-    </div>
-    ${admin ? metricsArea(all) : ''}
-    <div class="sheet-toolbar">
-      <h2>Atividades por designer</h2>
-      <span class="sp"></span>
-      ${whoSel}
-      <input class="search" type="search" placeholder="buscar cliente, nº lulu, atividade…" value="${esc(ui.sheet.q)}" data-sheet-q>
-      ${ppl.length > 1 ? `<button class="ghost sm" data-toggle-all>${ppl.every(p => ui.sheet.closed[p.id]) ? 'abrir todos' : 'recolher todos'}</button>` : ''}
-    </div>
-    ${blocks}
-    ${ppl.length > 1 ? `<div class="grand"><span>Total geral · ${esc(label)}</span><span>${grand.n} atividades</span><span>${fmtPts(grand.pts)} pts</span><b>${fmtBRL(grand.val)}</b></div>` : ''}
-  </section>`;
-}
-
-function metricsArea(all) {
-  const tot = all.reduce((t, { s }) => ({ pay: t.pay + (s.pay || 0), pts: t.pts + s.points, cards: t.cards + s.cards, min: t.min + s.minutes }), { pay: 0, pts: 0, cards: 0, min: 0 });
-  const lb = (title, sub, key, fmt) => {
-    const list = [...all].sort((a, b) => key(b.s) - key(a.s));
-    const max = Math.max(1e-9, ...list.map(x => key(x.s)));
-    return `<div class="card lb">
-      ${cardHead(title, sub)}
-      <ol>${list.map(({ p, s }, i) => `<li class="${i === 0 ? 'first' : ''}">
-        <span class="lb-pos">${i + 1}</span>${avatar(p, 'sm')}
-        <span class="lb-name">${esc(firstName(p.name))}</span>
-        <span class="lb-bar"><i style="width:${key(s) / max * 100}%;background:${p.color}"></i></span>
-        <b>${fmt(s)}</b></li>`).join('')}</ol>
-    </div>`;
-  };
-  return `<div class="kpis">
-      ${kpi('gasto no período', fmtBRL(tot.pay), `${fmtBRL(tot.cards ? tot.pay / tot.cards : 0)} por cliente`, 'ink')}
-      ${kpi('clientes atendidos', tot.cards, `${fmtPts(tot.pts)} pontos no total`)}
-      ${kpi('tempo online do time', fmtDur(tot.min), `${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h por designer`)}
-      ${kpi('custo por ponto', fmtBRL(tot.pts ? tot.pay / tot.pts : 0), `base ${fmtBRL(S.settings.pointValue)} + bônus`)}
-    </div>
-    <div class="lb-grid">
-      ${lb('Mais tempo online', 'horas no período', s => s.minutes, s => fmtDur(s.minutes))}
-      ${lb('Mais cards', 'clientes atendidos', s => s.cards, s => `${s.cards}`)}
-      ${lb('Gasto por designer', 'quanto cada um recebe', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay))}
-      ${lb('Mais pontos por cliente', 'qualidade da entrega', s => s.ptsPerCard, s => fmtNum(s.ptsPerCard))}
-    </div>`;
-}
-
-function exportCSV() {
-  const { from, to, label } = periodRange();
-  const n = v => String(v).replace('.', ',');
-  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Data', 'Hora', 'Cliente', 'Nº lulu', 'Modelo', 'Atividade', 'Qtd', 'Entrega', 'Pontos', 'Valor (R$)'].join(';')];
-  for (const p of sheetPeople()) {
-    const s = stats(p.id, from, to), rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
-    for (const r of sheetFilter(activityRows(p.id, from, to))) {
-      lines.push([q(p.name), p.regime, `${pad(r.t.getDate())}/${pad(r.t.getMonth() + 1)}/${r.t.getFullYear()}`, hm(r.t), q(r.card.client), r.card.luluId || '', q(r.card.model), q(typeOf(r.type).label), r.qty, `${r.round}ª`, n(r.pts), rate == null ? '' : n((r.pts * rate).toFixed(2))].join(';'));
-    }
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-  a.download = `aba-designers-${label.replace(/[^\wÀ-ú]+/g, '-')}.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
-  toast(`Planilha exportada · ${lines.length - 1} linhas`);
-}
-
-/* ============================================================
-   PAINEL
-   ============================================================ */
-function viewPainel() {
-  const { from, to, label } = periodRange();
-  const ds = designers();
-  const rows = ds.map(p => ({ p, s: stats(p.id, from, to) })).sort((a, b) => b.s.points - a.s.points);
-  const tot = rows.reduce((t, { s }) => ({ points: t.points + s.points, cards: t.cards + s.cards, minutes: t.minutes + s.minutes, pay: t.pay + (s.pay || 0) }), { points: 0, cards: 0, minutes: 0, pay: 0 });
-  const m = me(), admin = isAdmin();
-
-  let hero;
-  if (admin) {
-    hero = `<div class="kpis">
-      ${kpi('pontos', fmtPts(tot.points), `${rows.length} designers`, 'lime')}
-      ${kpi('clientes atendidos', tot.cards, tot.cards ? `${fmtNum(tot.points / tot.cards)} pts por cliente` : '—')}
-      ${kpi('tempo online', fmtDur(tot.minutes), 'soma do time')}
-      ${kpi('a pagar', fmtBRL(tot.pay), `${fmtBRL(S.settings.pointValue)} por ponto × bônus`, 'ink')}
-    </div>`;
-  } else {
-    const mine = rows.find(r => r.p.id === m.id) || { s: stats(m.id, from, to) };
-    const pos = rows.findIndex(r => r.p.id === m.id) + 1;
-    const s = mine.s;
-    hero = `<div class="hero" style="--pc:${m.color}">
-      <div class="hero-main">
-        <span class="eyebrow mono">${pos ? `${pos}º no time` : ''}</span>
-        <div class="hero-pts"><b>${fmtPts(s.points)}</b><span>pontos</span></div>
-        <p class="mono">${s.cards} clientes · ${fmtNum(s.ptsPerCard)} pts por cliente · ${fmtNum(s.cardsPerDay)} clientes/dia</p>
-      </div>
-      <div class="hero-side">
-        <div><span class="mono">tempo online</span><b>${fmtDur(s.minutes)}</b><small class="mono">${fmtNum(s.avgH)}h por dia</small></div>
-        <div><span class="mono">bônus de horas</span><b>${fmtMult(s.mult)}</b><small class="mono">${nextTierHint(s.avgH)}</small></div>
-        <div class="pay"><span class="mono">a receber</span><b>${s.pay == null ? '—' : fmtBRL(s.pay)}</b><small class="mono">${fmtPts(s.points)} × ${fmtBRL(S.settings.pointValue)} × ${fmtNum(s.mult, 2)}</small></div>
-      </div>
-    </div>`;
-  }
-
-  return `<section class="page">
-    <div class="page-head">
-      <button class="solid big" data-go="cards">${ico('cards')}Continuar nos cards</button><span class="vsep"></span>
-      ${periodTabs()}
-    </div>
-    ${meterCard()}
-    ${hero}
-    <div class="grid-2">
-      <div class="card list-card">${cardHead('Agora', admin ? 'desligue quem parou de responder' : 'quem está online neste momento')}${nightBanner()}${nowList()}</div>
-      <div class="card">${cardHead('Pontos ao longo do tempo', ui.period === 'hoje' ? 'por hora' : 'por dia')}${pointsChart(rows, from, to)}</div>
-    </div>
-    <div class="card">${cardHead('Fechamento', `${esc(label)} · bônus pela média de horas online por dia trabalhado`)}${rankTable(rows, from, to)}</div>
-    <div class="grid-2">
-      <div class="card">${cardHead('De onde vêm os pontos', 'por tipo de tarefa')}${breakdown(rows)}</div>
-      <div class="card">${cardHead('Escala noturna', 'combinado × cumprido no período')}${turnoSummary(from, to)}</div>
-    </div>
-  </section>`;
-}
-const kpi = (label, value, sub, tone = '') => `<div class="kpi ${tone}"><span class="mono">${label}</span><b>${value}</b><small class="mono">${sub}</small></div>`;
-const cardHead = (t, sub) => `<div class="card-head"><h3>${t}</h3>${sub ? `<span class="mono">${sub}</span>` : ''}</div>`;
-function nextTierHint(avgH) {
-  const t = [...S.settings.tiers].sort((a, b) => a.h - b.h).find(x => x.h > avgH);
-  return t ? `${fmtNum(t.h - avgH)}h/dia para ${fmtMult(t.mult)}` : 'bônus máximo';
-}
-
-function nowList() {
-  const admin = isAdmin(), now = new Date(), k = dkey(now);
-  const ds = designers().map(p => ({ p, s: openSession(p.id) })).sort((a, b) => (!!b.s - !!a.s));
-  return `<ul class="now-list">${ds.map(({ p, s }) => {
-    const last = S.sessions.filter(x => x.personId === p.id && x.end).sort((a, b) => new Date(b.end) - new Date(a.end))[0];
-    const night = committedHours(p.id, k);
-    const lastTxt = last ? `saiu ${sameDay(new Date(last.end), now) ? 'às ' + hm(new Date(last.end)) : 'em ' + WD[new Date(last.end).getDay()]}${last.endedBy === 'admin' ? ' · desligado pela gestão' : ''}` : 'sem registro';
-    return `<li class="${s ? 'on' : ''}">
-      ${avatar(p)}
-      <div class="nl-t"><b>${esc(p.name)}${p.regime === 'PJ' ? '<i class="badge-pj">PJ</i>' : ''}</b><small class="mono">${s ? `online há <span data-since="${s.start}"></span>` : lastTxt}${night.length ? ` · <span class="moon-t">☾ ${pad(night[0])}–${pad(night[night.length - 1] + 1)}h hoje</span>` : ''}</small></div>
-      <span class="nl-meter">${ticks(minutesOnline(p.id, startOfDay(now), now) / 600, 12)}</span>
-      ${admin ? `<label class="switch big" title="${s ? 'Desligar' : 'Ligar'}"><input type="checkbox" data-admin-online="${p.id}" ${s ? 'checked' : ''}><i></i></label>` : `<span class="pill-status mono">${s ? 'online' : 'offline'}</span>`}
-    </li>`;
-  }).join('')}</ul>`;
-}
-
-/* gráfico de barras empilhadas, feito à mão em SVG */
-function pointsChart(rows, from, to) {
-  const hourly = ui.period === 'hoje';
-  const buckets = [];
-  if (hourly) {
-    for (const h of range(H().start, H().nightEnd)) buckets.push({ key: h, label: pad(h) });
-  } else {
-    for (let d = startOfDay(from); d < to; d = addDays(d, 1)) {
-      if (isWeekendDate(d)) continue;
-      buckets.push({ key: dkey(d), label: ui.period === 'semana' ? WD[d.getDay()] : String(d.getDate()) });
-    }
-  }
-  const idx = new Map(buckets.map((b, i) => [b.key, i]));
-  const data = rows.map(({ p }) => ({ p, v: buckets.map(() => 0) }));
-  const pIdx = new Map(data.map((d, i) => [d.p.id, i]));
-  for (const c of S.cards) {
-    const di = pIdx.get(c.designerId); if (di == null) continue;
-    for (const e of c.entries) {
-      if (e.status !== 'feito' || !e.at) continue;
-      const t = new Date(e.at); if (t < from || t >= to) continue;
-      const bi = idx.get(hourly ? t.getHours() : dkey(t)); if (bi == null) continue;
-      data[di].v[bi] += typeOf(e.type).pts;
-    }
-  }
-  const sums = buckets.map((_, i) => data.reduce((s, d) => s + d.v[i], 0));
-  const max = Math.max(1, ...sums);
-  const mag = Math.pow(10, Math.floor(Math.log10(max / 4)));
-  const stepV = [1, 2, 2.5, 5, 10, 20].map(x => x * mag).find(x => Math.ceil(max / x) <= 5);
-  const lines = Math.max(1, Math.ceil(max / stepV)), nice = stepV * lines;
-  const W = 720, Hh = 230, pl = 34, pb = 26, pt = 10, pr = 6;
-  const iw = W - pl - pr, ih = Hh - pb - pt;
-  const bw = iw / Math.max(1, buckets.length);
-  const gap = Math.min(10, bw * 0.28);
-  let svg = `<svg class="chart" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="Pontos por ${hourly ? 'hora' : 'dia'}">`;
-  for (let g = 0; g <= lines; g++) {
-    const y = pt + ih - ih * g / lines;
-    svg += `<line x1="${pl}" x2="${W - pr}" y1="${y}" y2="${y}" class="grid-l"/><text x="${pl - 6}" y="${y + 3}" class="ax" text-anchor="end">${fmtPts(stepV * g)}</text>`;
-  }
-  buckets.forEach((b, i) => {
-    let y = pt + ih;
-    const x = pl + i * bw + gap / 2, w = Math.max(2, bw - gap);
-    data.forEach(d => {
-      const v = d.v[i]; if (!v) return;
-      const h = ih * v / nice;
-      y -= h;
-      svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0, h - 1.5).toFixed(1)}" rx="3" fill="${d.p.color}"><title>${esc(d.p.name)} · ${b.label}: ${fmtPts(v)} pts</title></rect>`;
-    });
-    const showLbl = buckets.length <= 16 || i % Math.ceil(buckets.length / 16) === 0;
-    if (showLbl) svg += `<text x="${(x + w / 2).toFixed(1)}" y="${Hh - 8}" class="ax" text-anchor="middle">${b.label}</text>`;
-  });
-  svg += '</svg>';
-  const leg = `<div class="chart-leg">${rows.map(({ p }) => `<span><i style="background:${p.color}"></i>${esc(firstName(p.name))}</span>`).join('')}</div>`;
-  return buckets.length ? svg + leg : '<p class="muted">Sem dias úteis no período.</p>';
-}
-
-function spark(perDay, from, to, color) {
-  const days = [];
-  for (let d = startOfDay(from); d < to; d = addDays(d, 1)) if (!isWeekendDate(d)) days.push(perDay[dkey(d)] || 0);
-  if (days.length < 2) return '';
-  const max = Math.max(1, ...days), W = 90, Hh = 26;
-  const pts = days.map((v, i) => `${(i / (days.length - 1) * W).toFixed(1)},${(Hh - 2 - v / max * (Hh - 4)).toFixed(1)}`).join(' ');
-  return `<svg class="spark" viewBox="0 0 ${W} ${Hh}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
-}
-
-function rankTable(rows, from, to) {
+function viewAtividades() {
   const admin = isAdmin(), m = me();
-  const max = Math.max(1, ...rows.map(r => r.s.points));
-  const body = rows.map(({ p, s }, i) => {
-    const showPay = admin || p.id === m.id;
-    return `<tr class="${p.id === m.id ? 'mine' : ''}">
-      <td class="pos mono">${i + 1}</td>
-      <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small class="mono">${p.regime}</small></span></div></td>
-      <td><div class="bar-cell"><div class="pbar"><i style="width:${s.points / max * 100}%;background:${p.color}"></i></div><b class="mono">${fmtPts(s.points)}</b></div></td>
-      <td class="mono">${s.cards}</td>
-      <td class="mono">${fmtNum(s.cardsPerDay)}</td>
-      <td class="mono">${fmtNum(s.ptsPerCard)}</td>
-      <td class="mono">${fmtDur(s.minutes)}<small>${fmtNum(s.avgH)}h/dia</small></td>
-      <td class="mono"><span class="mult m${Math.round((s.mult - 1) * 10)}">${fmtMult(s.mult)}</span></td>
-      <td class="mono pay-cell">${showPay ? (s.pay == null ? '<span class="muted">fixo</span>' : fmtBRL(s.pay)) : '<span class="muted">·····</span>'}</td>
-      <td>${spark(s.perDay, from, to, p.color)}</td>
-    </tr>`;
-  }).join('');
-  const totPay = rows.reduce((t, r) => t + (r.s.pay || 0), 0);
-  return `<div class="table-wrap"><table class="rank">
-    <thead><tr><th></th><th>designer</th><th>pontos</th><th>clientes</th><th>por dia</th><th>pts/cliente</th><th>online</th><th>bônus</th><th>a receber</th><th>ritmo</th></tr></thead>
-    <tbody>${body}</tbody>
-    ${admin ? `<tfoot><tr><td></td><td>total</td><td class="mono">${fmtPts(rows.reduce((t, r) => t + r.s.points, 0))}</td><td class="mono">${rows.reduce((t, r) => t + r.s.cards, 0)}</td><td></td><td></td><td class="mono">${fmtDur(rows.reduce((t, r) => t + r.s.minutes, 0))}</td><td></td><td class="mono pay-cell">${fmtBRL(totPay)}</td><td></td></tr></tfoot>` : ''}
-  </table></div>`;
+  if (admin && !designers().length) return welcome();
+  const { from, to } = period();
+  const ppl = admin ? (ui.who === 'all' ? designers() : [person(ui.who)].filter(Boolean)) : [m];
+  const pool = S.activities.filter(a => inRange(a.date, from, to) && ppl.some(p => p.id === a.designerId));
+  const countBy = st => st === 'todas' ? pool.length : pool.filter(a => a.status === st).length;
+  const tabs = [['todas', 'Todas'], ['pendente', 'Aguardando'], ['aprovada', 'Aprovadas'], ['erro', 'Com erro'], ['recusada', 'Recusadas']];
+
+  const head = `<div class="page-head">
+    <button class="solid big" data-new>${ico('plus')}${admin ? 'Atividade extra' : 'Nova atividade'}</button><span class="vsep"></span>
+    ${periodCtl()}
+    <span class="sp"></span>
+    <div class="tab-row">${tabs.map(([v, l]) => `<button class="tab-pill ${ui.status === v ? 'on' : ''} ${v === 'pendente' && countBy(v) ? 'warn' : ''}" data-status="${v}"><span>${l}</span><b>${countBy(v)}</b></button>`).join('')}</div>
+  </div>`;
+
+  const top = admin ? onlinePanel() : mySummary(m) + quickAdd(m);
+
+  const toolbar = `<div class="sheet-toolbar">
+    <h2>${admin ? 'Atividades do time' : 'Suas atividades'}</h2><span class="sp"></span>
+    ${admin ? `<select class="pill-select" data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>` : ''}
+    <input class="search" type="search" placeholder="buscar cliente, nº lulu, atividade…" value="${esc(ui.q)}" data-q>
+  </div>`;
+
+  return `<section class="page">${head}${top}${toolbar}${ppl.map(p => activityBlock(p, from, to)).join('')}</section>`;
 }
 
-function breakdown(rows) {
-  const isMine = !isAdmin();
-  const src = isMine ? rows.filter(r => r.p.id === me().id) : rows;
-  const by = {};
-  src.forEach(({ s }) => Object.entries(s.byType).forEach(([k, v]) => { by[k] = (by[k] || 0) + v; }));
-  const total = Object.values(by).reduce((a, b) => a + b, 0);
-  if (!total) return '<p class="muted">Nenhum ponto no período.</p>';
-  const types = S.settings.itemTypes.filter(t => by[t.id]);
-  return `<div class="stackbar">${types.map(t => `<i style="width:${by[t.id] / total * 100}%;background:${t.color}" title="${esc(t.label)}"></i>`).join('')}</div>
-    <ul class="bd-list">${types.map(t => `<li style="--tc:${t.color}"><i></i><span>${esc(t.label)}</span><small class="mono">${Math.round(by[t.id] / typeOf(t.id).pts || 0)} itens</small><b class="mono">${fmtPts(by[t.id])} pts</b><em class="mono">${Math.round(by[t.id] / total * 100)}%</em></li>`).join('')}</ul>
-    ${isMine ? '<p class="muted mono small">mostrando só os seus pontos</p>' : ''}`;
-}
-
-function turnoSummary(from, to) {
-  const res = {};
-  for (let d = startOfDay(from); d < to; d = addDays(d, 1)) {
-    const k = dkey(d);
-    for (const p of designers()) {
-      const r = nightResult(p.id, k); if (!r) continue;
-      (res[p.id] = res[p.id] || []).push({ k, r });
-    }
-  }
-  const ids = Object.keys(res);
-  if (!ids.length) return '<p class="muted">Ninguém escalado no período.</p>';
-  return `<ul class="ts-list">${ids.map(id => {
-    const p = person(id), list = res[id];
-    const c = st => list.filter(x => x.r.status === st).length;
-    const cut = list.filter(x => x.r.cut).length;
-    return `<li>${avatar(p, 'sm')}<span class="ts-name"><b>${esc(firstName(p.name))}</b><small class="mono">${list.length} noites · ${c('ficou')} cumpridas${c('parcial') ? ` · ${c('parcial')} saiu antes` : ''}${c('faltou') ? ` · ${c('faltou')} faltou` : ''}${cut ? ` · ${cut} desligado` : ''}</small></span>
-      <span class="ts-dots">${list.map(x => `<i class="tsd ${x.r.status}" title="${x.k}: ${statusTxt(x.r)}"></i>`).join('')}</span></li>`;
-  }).join('')}</ul>
-  <div class="ts-leg mono"><span><i class="tsd ficou"></i>ficou</span><span><i class="tsd parcial"></i>saiu antes</span><span><i class="tsd faltou"></i>não ficou</span><span><i class="tsd futuro"></i>ainda vai</span></div>`;
-}
-function statusTxt(r) {
-  if (!r) return '';
-  if (r.status === 'futuro') return `combinou ${pad(r.hrs[0])}–${pad(r.hrs[r.hrs.length - 1] + 1)}h`;
-  if (r.live) return 'está na escala agora';
-  if (r.status === 'ficou') return 'ficou até o fim';
-  if (r.status === 'faltou') return 'não ficou';
-  return `saiu ${r.lastEnd ? 'às ' + hm(r.lastEnd) : 'antes'}${r.cut ? ' (desligado pela gestão)' : ''}`;
-}
-
-/* ============================================================
-   CARDS
-   ============================================================ */
-function viewCards() {
-  const m = me(), admin = isAdmin();
-  let pool = S.cards;
-  const who = admin ? ui.cardWho : (ui.cardWho === 'all' ? 'all' : 'me');
-  if (who === 'me' && !admin) pool = pool.filter(c => c.designerId === m.id || c.status === 'fila');
-  else if (who !== 'all' && who !== 'me') pool = pool.filter(c => c.designerId === who || c.status === 'fila');
-  if (ui.q) { const q = ui.q.toLowerCase(); pool = pool.filter(c => (c.client + ' ' + (c.luluId || '') + ' ' + c.seller + ' ' + c.model).toLowerCase().includes(q)); }
-  const by = st => pool.filter(c => c.status === st);
-  const tabs = [['fila', 'Sem designer'], ['fazendo', 'Em andamento'], ['entregue', 'Entregues']];
-  let list = by(ui.cardTab);
-  const total = list.length;
-  if (ui.cardTab === 'entregue') list = list.slice(0, ui.shownDone);
-
-  const whoCtl = admin
-    ? `<select class="pill-select" data-cardwho>${[['all', 'Todo o time'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.cardWho === v || (v === 'all' && ui.cardWho === 'me') ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`
-    : `<div class="seg small"><button data-cardwho-btn="me" class="${who === 'me' ? 'on' : ''}">meus</button><button data-cardwho-btn="all" class="${who === 'all' ? 'on' : ''}">time todo</button></div>`;
-
-  return `<section class="page">
-    <div class="page-head">
-      <button class="solid big" data-new-card>${ico('plus')}Novo card</button><span class="vsep"></span>
-      <div class="tab-row">${tabs.map(([v, l]) => `<button data-cardtab="${v}" class="tab-pill ${ui.cardTab === v ? 'on' : ''}">${ico(v === 'fila' ? 'down' : v === 'fazendo' ? 'cards' : 'arrow')}<span>${l}</span><b>${by(v).length}</b></button>`).join('')}</div>
-      <span class="sp"></span><button class="ghost" data-sim-lulu>${ico('down')}Simular cliente do lulu</button>
+function welcome() {
+  return `<section class="page"><div class="welcome">
+    <img src="img/seubone-logo-branco.png" alt="SeuBoné" class="w-logo">
+    <h2>Bem-vindo ao <b>Dedé</b></h2>
+    <p>Aqui os designers lançam o que fizeram no dia, você confere, aprova e acompanha os pontos, as horas online e quanto cada um tem a receber.</p>
+    <div class="w-steps">
+      <div><b>1</b><span>Cadastre os designers</span></div>
+      <div><b>2</b><span>Confira a tabela de pontos e o valor do ponto</span></div>
+      <div><b>3</b><span>Os designers entram e lançam as atividades</span></div>
     </div>
-    <div class="toolbar">
-      <span class="sp"></span>
-      ${whoCtl}
-      <input class="search" type="search" placeholder="buscar cliente, nº lulu, vendedor…" value="${esc(ui.q)}" data-search>
-    </div>
-    ${ui.cardTab === 'fila' ? `<p class="hint mono">Clientes que chegaram do lulu sem designer. ${admin ? 'Escolha quem vai fazer.' : 'Pegue um para você.'}</p>` : ''}
-    ${ui.cardTab === 'fazendo' ? `<p class="hint mono">Marque ✓ no que fez e ✕ no que não fez. Use + para variações e mudanças. As variações livres só contam na 1ª entrega (até ${typeOf('var_livre').max || '∞'}).</p>` : ''}
-    <div class="tags">${list.map(tagCard).join('') || `<div class="empty-state small"><p>${ui.cardTab === 'fila' ? 'Nenhum cliente esperando.' : 'Nada por aqui.'}</p></div>`}</div>
-    ${total > list.length ? `<div class="more"><button class="ghost" data-more>ver mais ${Math.min(40, total - list.length)} de ${total - list.length}</button></div>` : ''}
-  </section>`;
+    <div class="btns"><button class="solid big light-solid" data-add-person>${ico('plus')}Cadastrar primeiro designer</button><button class="ghost light" data-io="demo">ver com dados de exemplo</button></div>
+  </div></section>`;
 }
 
-function tagCard(c) {
-  const d = person(c.designerId), admin = isAdmin(), m = me();
-  const mine = c.designerId === m.id;
-  const editable = c.status === 'fazendo' && (admin || mine);
-  const pts = cardPts(c);
-  const created = new Date(c.createdAt);
-  const when = sameDay(created, new Date()) ? `hoje ${hm(created)}` : `${created.getDate()} ${MES[created.getMonth()]} ${hm(created)}`;
-  const rows = S.settings.itemTypes.map(t => {
-    const ents = c.entries.filter(e => e.type === t.id);
-    const done = ents.filter(e => e.status === 'feito').length;
-    const pend = ents.filter(e => e.status === 'pendente');
-    const no = ents.filter(e => e.status === 'nao').length;
-    if (!ents.length) return '';
-    const block = editable ? canAdd(c, t.id) : 'x';
-    const locked = editable && t.firstOnly && c.round > 1;
-    return `<li class="it ${!done && !pend.length ? 'zero' : ''} ${locked ? 'locked' : ''}" style="--tc:${t.color}">
-      <span class="it-dot"></span>
-      <span class="it-l">${esc(t.label)}<small class="mono">${fmtPts(t.pts)} pt${t.max ? ` · até ${t.max}` : ''}${t.firstOnly ? ' · 1ª entrega' : ''}</small></span>
-      <span class="it-ctrl">
-        ${pend.map(e => (admin || mine) && c.status !== 'fila' ? `<span class="pend"><button type="button" data-ent="${e.id}" data-to="feito">✓ fiz</button><button type="button" data-ent="${e.id}" data-to="nao" title="não fiz">✕</button></span>` : `<span class="pend-ro mono">aguardando</span>`).join('')}
-        ${no ? `<span class="no mono">${no} não fiz</span>` : ''}
-        ${editable ? `<button type="button" class="ct" data-dec="${t.id}" ${!done ? 'disabled' : ''} aria-label="menos">−</button><b class="mono n">${done}</b><button type="button" class="ct" data-inc="${t.id}" ${block ? `disabled title="${esc(block)}"` : ''} aria-label="mais">+</button>` : (done ? `<b class="mono n">${done}</b>` : '')}
-      </span></li>`;
-  }).join('');
-
-  const adders = editable ? `<div class="adders"><span class="mono">adicionar</span>${S.settings.itemTypes.map(t => { const b = canAdd(c, t.id); return `<button type="button" class="add-chip" style="--tc:${t.color}" data-inc="${t.id}" ${b ? `disabled title="${esc(b)}"` : ''}>+ ${esc(t.short || t.label)}</button>`; }).join('')}</div>` : '';
-  let actions = '';
-  if (c.status === 'fila') {
-    actions = admin
-      ? `<select class="pill-select" data-assign><option value="">entregar para…</option>${designers().map(p => `<option value="${p.id}">${esc(p.name)}${isOnlineNow(p.id) ? ' · online' : ''}</option>`).join('')}</select>`
-      : `<button class="solid sm" data-take>pegar este cliente</button>`;
-  } else if (c.status === 'fazendo') {
-    actions = (admin || mine)
-      ? `<button class="ghost sm" data-round title="O cliente pediu ajustes: abre a ${c.round + 1}ª entrega">cliente pediu ajuste</button><button class="solid sm" data-deliver>entregue ✓</button>`
-      : '';
-  } else if (admin || mine) {
-    actions = `<button class="ghost sm" data-reopen>reabrir</button>`;
-  }
-
-  return `<article class="tag st-${c.status}" data-card="${c.id}" style="--pc:${d ? d.color : '#B9B0A0'}">
-    <span class="tag-hole" aria-hidden="true"></span>
-    <header class="tag-head">
-      <div class="tag-id mono">${c.luluId ? `lulu #${esc(c.luluId)}` : 'manual'} · ${when}</div>
-      <h3>${esc(c.client)}</h3>
-      <p class="mono">${esc(c.model || 'modelo —')}${c.seller ? ` · vend. ${esc(c.seller)}` : ''}</p>
-    </header>
-    <div class="tag-pts"><b>${fmtPts(pts)}</b><span class="mono">pts</span></div>
-    <ul class="items">${rows || '<li class="it-empty mono">nada lançado ainda</li>'}</ul>${adders}
-    <footer class="tag-foot">
-      <span class="tag-who">${d ? avatar(d, 'sm') + `<span>${esc(firstName(d.name))}</span>` : '<span class="mono muted">sem designer</span>'}</span>
-      <span class="round mono">${c.round}ª entrega</span>
-      <span class="sp"></span>${actions}
-    </footer>
-  </article>`;
-}
-
-/* ============================================================
-   TURNO
-   ============================================================ */
-function viewTurno() {
-  const day = ui.day, k = dkey(day), now = new Date(), isToday = sameDay(day, now);
-  const hrs = H(), span = hrs.nightEnd - hrs.start;
-  const X = t => Math.min(100, Math.max(0, ((t.getHours() + t.getMinutes() / 60) - hrs.start) / span * 100));
-  const Xh = h => (h - hrs.start) / span * 100;
-  const weekend = isWeekendDate(day);
-
-  const rows = designers().map(p => {
-    const planned = [];
-    if (!weekend) {
-      if (p.regime === 'CLT') planned.push([hrs.start, hrs.lunch, 'day'], [hrs.lunch + 1, hrs.end, 'day']);
-      else planned.push([hrs.start, hrs.end, 'day']);
-    }
-    const nh = committedHours(p.id, k);
-    // agrupa horas seguidas da escala
-    nh.forEach(h => { const last = planned[planned.length - 1]; if (last && last[2] === 'night' && last[1] === h) last[1] = h + 1; else planned.push([h, h + 1, 'night']); });
-    const sess = sessionsOn(p.id, day);
-    const dayFrom = startOfDay(day), dayTo = addDays(day, 1);
-    const onMin = minutesOnline(p.id, dayFrom, dayTo);
-    const nr = nightResult(p.id, k);
-    const bars = sess.map(s => {
-      const a = new Date(Math.max(new Date(s.start), at(day, hrs.start)));
-      const b = s.end ? new Date(s.end) : now;
-      const l = X(a), r = X(b > at(day, hrs.nightEnd) ? at(day, hrs.nightEnd) : b);
-      if (r <= l) return '';
-      return `<div class="sess ${s.end ? '' : 'live'} ${s.endedBy === 'admin' ? 'cut' : ''}" style="left:${l}%;width:${r - l}%" title="${hm(new Date(s.start))}–${s.end ? hm(b) : 'agora'}${s.endedBy === 'admin' ? ' · desligado pela gestão' : ''}">${r - l > 7 ? `<span class="mono">${hm(new Date(s.start))}–${s.end ? hm(b) : 'agora'}</span>` : ''}</div>`;
-    }).join('');
-    const plan = planned.map(([a, b, kind]) => `<div class="plan ${kind}" style="left:${Xh(a)}%;width:${Xh(b) - Xh(a)}%"></div>`).join('');
-    const nightTxt = nr ? `<span class="nt ${nr.live ? 'live' : nr.status}">☾ ${esc(statusTxt(nr))}</span>` : '';
-    return `<div class="t-row" style="--pc:${p.color}">
-      <div class="t-who">${avatar(p)}<div><b>${esc(p.name)}</b><small class="mono">${onMin ? `online ${fmtDur(onMin)}` : (day > now ? '—' : 'não entrou')}</small>${nightTxt}</div></div>
-      <div class="t-track">${plan}${bars}</div>
-    </div>`;
-  }).join('');
-
-  const hoursHead = range(hrs.start, hrs.nightEnd).map(h => `<span class="${h >= hrs.end ? 'n' : ''}" style="left:${Xh(h)}%">${pad(h)}</span>`).join('');
-  const nowLine = isToday && now.getHours() >= hrs.start && now.getHours() < hrs.nightEnd ? `<div class="t-now" style="left:calc(var(--who) + (100% - var(--who) - 22px) * ${(X(now) / 100).toFixed(4)})" data-t="${hm(now)}"></div>` : '';
-
-  return `<section class="page">
-    <div class="page-head">
-      <button class="solid big" data-dayshift="0">${ico('cal')}Hoje</button><span class="vsep"></span>
-      <div class="date-btns"><button class="icon" data-dayshift="-1" aria-label="dia anterior">←</button><button class="icon" data-dayshift="1" aria-label="próximo dia">→</button></div></div>
-    ${weekStrip()}
-    <div class="card flush">
-      ${cardHead('Combinado × real', 'contorno = o que a pessoa combinou · barra = quanto ficou online de verdade')}
-      <div class="t-scroll"><div class="t-board">
-        <div class="t-head"><div></div><div class="t-hours">${hoursHead}<i class="t-nightbg" style="left:${Xh(hrs.end)}%"></i></div></div>
-        ${rows}
-        ${nowLine}
-      </div></div>
-      <div class="legend mono"><span><i class="lg plan-day"></i>expediente combinado</span><span><i class="lg plan-night"></i>disse que fica à noite</span><span><i class="lg lg-sess"></i>online de verdade</span><span><i class="lg lg-cut"></i>desligado pela gestão</span></div>
-    </div>
-    ${escalaWeek()}
-  </section>`;
-}
-
-function weekStrip() {
-  const ws = startOfWeek(ui.day), today = dkey(new Date()), sel = dkey(ui.day);
-  return `<div class="week">${range(0, 7).map(i => {
-    const d = addDays(ws, i), k = dkey(d);
-    const ppl = [...new Set(NIGHT().flatMap(h => shiftIds(k, h)))].map(person).filter(Boolean);
-    const res = ppl.map(p => nightResult(p.id, k));
-    const on = designers().filter(p => sessionsOn(p.id, d).length).length;
-    return `<button class="day ${k === sel ? 'on' : ''} ${k === today ? 'is-today' : ''} ${isWeekendDate(d) ? 'we' : ''}" data-day="${k}">
-      <span class="d-wd">${WD[d.getDay()]}</span><span class="d-n">${d.getDate()}</span>
-      <span class="d-meta mono">${on ? `${on} on` : ''}</span>
-      <span class="d-night">${ppl.length ? '☾&nbsp;' + ppl.map((p, j) => `<i style="--pc:${p.color}" class="r-${res[j] ? (res[j].live ? 'live' : res[j].status) : ''}" title="${esc(p.name)}: ${esc(statusTxt(res[j]))}">${esc(initials(p.name))}</i>`).join('') : '<s>☾ —</s>'}</span>
-    </button>`;
-  }).join('')}</div>`;
-}
-
-function escalaWeek() {
-  const ws = startOfWeek(ui.day), days = range(0, 7).map(i => addDays(ws, i));
-  const today = dkey(new Date()), admin = isAdmin(), m = me();
-  let g = `<div class="esc-grid"><div class="eg-corner">☾</div>`;
-  g += days.map(d => `<div class="eg-day ${dkey(d) === today ? 'is-today' : ''}"><span class="mono">${WD[d.getDay()]}</span><b>${d.getDate()}</b></div>`).join('');
-  for (const h of NIGHT()) {
-    g += `<div class="eg-h mono">${pad(h)}–${pad(h + 1)}h</div>`;
-    for (const d of days) {
-      const k = dkey(d), ids = shiftIds(k, h), ps = ids.map(person);
-      const past = at(d, h + 1) <= new Date();
-      const we = isWeekendDate(d) && !S.settings.weekendNight;
-      const iAm = ids.includes(m.id);
-      const cells = ps.map(p => {
-        let st = '';
-        if (past) { const on = minutesOnline(p.id, at(d, h), at(d, h + 1)); st = on >= 50 ? 'ok' : on > 3 ? 'meio' : 'nao'; }
-        return `<span class="eg-p ${st}" style="--pc:${p.color}" title="${esc(p.name)}${st === 'ok' ? ' · ficou' : st === 'meio' ? ' · ficou parte' : st === 'nao' ? ' · não ficou' : ''}">${avatar(p, 'sm')}${ps.length === 1 ? `<span>${esc(firstName(p.name))}</span>` : ''}</span>`;
-      }).join('');
-      const can = admin || (!past && m.role === 'designer');
-      const label = !ps.length ? (can ? (admin ? '+ escalar' : '+ eu fico') : '—') : '';
-      g += `<button class="eg-cell ${ps.length ? 'filled' : 'vazio'} ${iAm ? 'me' : ''} ${we ? 'we' : ''} ${past ? 'past' : ''}" ${can ? `data-shift-open="${k}" data-h="${h}"` : 'disabled'} title="${admin ? 'clique para escolher quem fica' : iAm ? 'clique para sair desse horário' : 'clique para dizer que fica'}">${cells}<span class="mono lbl">${label}</span></button>`;
-    }
-  }
-  g += '</div>';
-  const side = admin ? `<div class="esc-tools">
-      <div class="seg small"><button data-rot="noite" class="${ui.rotation === 'noite' ? 'on' : ''}">noite inteira</button><button data-rot="hora" class="${ui.rotation === 'hora' ? 'on' : ''}">revezar por hora</button></div>
-      <button class="ghost light sm" data-gen="week">preencher semana</button><button class="ghost light sm" data-gen="clear">limpar</button>
-    </div>` : `<span class="mono esc-tip">clique num horário para dizer que você fica (ou para sair)</span>`;
-  return `<div class="esc-main"><div class="stars"></div>
-    <div class="esc-head"><h2>quem disse que fica até as ${H().nightEnd}h</h2>${side}</div>
-    <div class="esc-scroll">${g}</div>
-    <div class="esc-leg mono"><span><i class="eg-dot ok"></i>ficou</span><span><i class="eg-dot meio"></i>ficou parte</span><span><i class="eg-dot nao"></i>não ficou</span></div>
+function mySummary(p) {
+  const { from, to, label } = period();
+  const s = stats(p.id, from, to);
+  return `<div class="my-sum" style="--pc:${p.color}">
+    <div class="ms-main"><span>${esc(label)}</span><b>${fmtPts(s.points)}</b><small>pontos aprovados</small></div>
+    <div><span>aguardando</span><b>${fmtPts(s.pendingPts)}</b><small>${s.pending} atividade${s.pending === 1 ? '' : 's'}</small></div>
+    <div><span>tempo online</span><b>${fmtDur(s.minutes)}</b><small>lançado pela gestão</small></div>
+    <div><span>bônus</span><b>${fmtMult(s.mult)}</b><small>${fmtNum(s.avgH)}h por dia</small></div>
+    <div class="ms-pay"><span>a receber</span><b>${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</b><small>só o que foi aprovado</small></div>
   </div>`;
 }
 
-/* preenche horários vazios da escala com quem é PJ (ou recebe por pontos e já fez noite) */
-function fillShifts(days, mode) {
-  const elig = designers().filter(p => p.regime === 'PJ');
-  if (!elig.length) return -1;
-  const counts = {};
-  Object.entries(S.shifts).forEach(([, hrs]) => Object.values(hrs).forEach(ids => ids.forEach(id => { counts[id] = (counts[id] || 0) + 1; })));
-  const n = elig.length; let filled = 0;
-  const pick = (salt, avoid) => elig.map((e, i) => ({ e, c: counts[e.id] || 0, x: e.id === avoid ? 1 : 0, o: ((i - salt) % n + n) % n })).sort((a, b) => a.c - b.c || a.x - b.x || a.o - b.o)[0].e;
-  for (const d of days) {
-    if (isWeekendDate(d) && !S.settings.weekendNight) continue;
-    const k = dkey(d), salt = Math.floor(d.getTime() / 864e5);
-    if (mode === 'noite') {
-      const empty = NIGHT().filter(h => !shiftIds(k, h).length); if (!empty.length) continue;
-      const p = pick(salt, shiftIds(dkey(addDays(d, -1)), H().end)[0]);
-      empty.forEach(h => { setShiftIds(k, h, [p.id]); counts[p.id] = (counts[p.id] || 0) + 1; filled++; });
-    } else {
-      let prev = null;
-      for (const h of NIGHT()) { const cur = shiftIds(k, h); if (cur.length) { prev = cur[0]; continue; } const p = pick(salt + h, prev); setShiftIds(k, h, [p.id]); counts[p.id] = (counts[p.id] || 0) + 1; prev = p.id; filled++; }
-    }
-  }
-  return filled;
+/* linha de lançamento rápido, estilo planilha */
+function quickAdd(p) {
+  const now = new Date(), k = dkey(ui.period === 'dia' ? ui.day : now);
+  const t = S.settings.itemTypes[0];
+  return `<form class="quick" id="quickForm" autocomplete="off">
+    <div class="q-title">${ico('plus')}<b>Lançar atividade</b><span>preencha e aperte Enter</span></div>
+    <div class="q-row">
+      <label class="q-date">Data<input type="date" name="date" value="${k}" max="${dkey(now)}"></label>
+      <label class="q-time">Hora<input type="time" name="time" value="${hm(now)}"></label>
+      <label class="q-client">Cliente<input name="client" placeholder="Nome do cliente" required list="clientList"></label>
+      <label class="q-lulu">Nº lulu<input name="luluId" placeholder="opcional" inputmode="numeric"></label>
+      <label class="q-type">Atividade<select name="type">${S.settings.itemTypes.map(x => `<option value="${x.id}">${esc(x.label)} · ${fmtPts(x.pts)} pt</option>`).join('')}</select></label>
+      <label class="q-qty">Qtd<input type="number" name="qty" min="1" max="50" value="1"></label>
+      <div class="q-pts"><span>Pontos</span><b id="qPts">${fmtPts(t.pts)}</b></div>
+      <button class="solid" type="submit">${ico('plus')}Adicionar</button>
+    </div>
+    <datalist id="clientList">${[...new Set(S.activities.filter(a => a.designerId === p.id && a.client).slice(-60).map(a => a.client))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <p class="q-warn" id="qWarn"></p>
+  </form>`;
 }
 
-/* ============================================================
-   PONTUAÇÃO
-   ============================================================ */
-function viewPontos() {
-  const admin = isAdmin(), st = S.settings;
-  if (!ui.sim) { ui.sim = { h: 9 }; st.itemTypes.forEach(t => { ui.sim[t.id] = t.id === 'logo' ? 1 : t.id === 'var_livre' ? (t.max || 2) : 0; }); }
-  const ex = st.itemTypes.find(t => t.id === 'var_livre');
-  const exPts = typeOf('logo').pts + (ex ? ex.pts * (ex.max || 0) : 0);
+/* horas online lançadas pelo admin */
+function onlinePanel() {
+  const ds = designers();
+  if (ui.period === 'mes') return `<div class="card hint-card">${ico('clock')}<span>Para lançar as horas online, mude para <b>Dia</b> ou <b>Semana</b>.</span></div>`;
+  const days = ui.period === 'semana' ? range(0, 7).map(i => addDays(startOfWeek(ui.day), i)) : [startOfDay(ui.day)];
+  const today = dkey(new Date());
+  return `<div class="card online-card">
+    <div class="card-head"><h3>${ico('clock')} Horas online</h3><span>quanto tempo cada designer ficou online · digite como 8:30 ou 8,5</span></div>
+    <div class="table-wrap"><table class="hours-grid">
+      <thead><tr><th>Designer</th>${days.map(d => `<th class="${dkey(d) === today ? 'today' : ''} ${isWeekendDate(d) ? 'we' : ''}">${WD[d.getDay()]} ${d.getDate()}</th>`).join('')}${days.length > 1 ? '<th>Total</th>' : ''}</tr></thead>
+      <tbody>${ds.map(p => {
+        const tot = days.reduce((s, d) => s + onlineMin(p.id, dkey(d)), 0);
+        return `<tr><td class="hg-who">${avatar(p, 'sm')}<span>${esc(p.name)}</span><small>${p.regime}</small></td>
+          ${days.map(d => { const k = dkey(d), v = onlineMin(p.id, k); return `<td class="${isWeekendDate(d) ? 'we' : ''}"><input class="hm-in ${v ? 'has' : ''}" data-online="${p.id}|${k}" value="${toHM(v)}" placeholder="—" inputmode="decimal"></td>`; }).join('')}
+          ${days.length > 1 ? `<td class="hg-tot">${fmtDur(tot)}</td>` : ''}</tr>`;
+      }).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
 
-  const rows = st.itemTypes.map((t, i) => `<li class="menu-row" style="--tc:${t.color}">
-    <span class="mr-dot"></span>
-    <div class="mr-main">
-      ${admin ? `<input class="mr-label" data-tf="${t.id}|label" value="${esc(t.label)}">` : `<b>${esc(t.label)}</b>`}
-      ${admin ? `<input class="mr-hint mono" data-tf="${t.id}|hint" value="${esc(t.hint || '')}" placeholder="descrição">` : `<small>${esc(t.hint || '')}</small>`}
-      <div class="mr-rules mono">
-        ${admin ? `<label>limite por cliente <input type="number" min="0" step="1" data-tf="${t.id}|max" value="${t.max || ''}" placeholder="∞"></label>
-                   <label class="switch sm"><input type="checkbox" data-tf="${t.id}|firstOnly" ${t.firstOnly ? 'checked' : ''}><i></i>só na 1ª entrega</label>
-                   <label class="clr"><input type="color" data-tf="${t.id}|color" value="${t.color}"></label>
-                   ${['logo', 'var_livre'].includes(t.id) ? '' : `<button class="ghost sm danger" data-del-type="${t.id}">remover</button>`}`
-                : `${t.max ? `<span>até ${t.max} por cliente</span>` : '<span>sem limite</span>'}${t.firstOnly ? '<span>só na 1ª entrega</span>' : ''}`}
+function activityBlock(p, from, to) {
+  const admin = isAdmin();
+  const s = stats(p.id, from, to);
+  const rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
+  let rows = s.acts.slice();
+  if (ui.status !== 'todas') rows = rows.filter(a => a.status === ui.status);
+  if (ui.q) { const q = ui.q.toLowerCase(); rows = rows.filter(a => `${a.client} ${a.luluId} ${typeOf(a.type).label} ${a.desc}`.toLowerCase().includes(q)); }
+  rows.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  const closed = ui.closed[p.id];
+  const pendN = s.acts.filter(a => a.status === 'pendente').length;
+  let lastDay = '', n = 0;
+  const body = rows.map(a => {
+    const t = typeOf(a.type), st = STATUS[a.status], warn = a.status !== 'recusada' && !a.extra ? ruleWarnings(a) : '';
+    const sug = a.extra ? null : suggestedPts(a.type, a.qty);
+    const adjusted = sug != null && Math.abs(sug - a.pts) > 0.001;
+    const newDay = a.date !== lastDay; lastDay = a.date;
+    const mine = a.designerId === me().id;
+    const canEdit = admin || (mine && a.status !== 'aprovada' && a.status !== 'recusada');
+    const val = rate == null ? null : a.pts * rate;
+    let actions = '';
+    if (admin) {
+      actions = `${a.status !== 'aprovada' ? `<button class="act-btn ok" data-approve="${a.id}" title="Aprovar">${ico('check')}</button>` : ''}
+        ${a.status !== 'erro' ? `<button class="act-btn err" data-mark="${a.id}|erro" title="Apontar erro">${ico('alert')}</button>` : ''}
+        ${a.status !== 'recusada' ? `<button class="act-btn no" data-mark="${a.id}|recusada" title="Recusar">${ico('x')}</button>` : ''}
+        <button class="act-btn" data-edit-act="${a.id}" title="Editar">${ico('edit')}</button>`;
+    } else if (canEdit) {
+      actions = `<button class="act-btn" data-edit-act="${a.id}" title="${a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar'}">${ico('edit')}</button><button class="act-btn no" data-del-act="${a.id}" title="Excluir">${ico('trash')}</button>`;
+    }
+    return `<tr class="${newDay ? 'newday' : ''} row-${a.status}">
+      <td class="rn">${++n}</td>
+      <td class="c-date">${fmtDay(a.date)}</td>
+      <td class="c-time">${esc(a.time || '')}</td>
+      <td class="c-client"><b>${esc(a.client || '—')}</b><small>${a.luluId ? `lulu #${esc(a.luluId)}` : a.extra ? 'criada pela gestão' : 'sem nº lulu'}${a.desc && a.desc !== a.client ? ' · ' + esc(a.desc) : ''}</small></td>
+      <td class="c-act"><span class="act" style="--tc:${t.color}"><i></i>${a.extra ? 'Extra' : esc(t.label)}</span>${a.qty > 1 ? `<em>×${a.qty}</em>` : ''}${warn ? `<span class="rule-warn" title="${esc(warn)}">${ico('alert')}</span>` : ''}</td>
+      <td class="num c-pts">${admin ? `<input class="pts-in ${adjusted ? 'adj' : ''}" type="number" step="0.25" min="0" value="${a.pts}" data-pts="${a.id}" title="${adjusted ? `sugerido: ${fmtPts(sug)}` : 'pontuação'}">` : `${fmtPts(a.pts)}${adjusted ? `<small class="adj-note">era ${fmtPts(sug)}</small>` : ''}`}</td>
+      <td class="num money ${a.status === 'aprovada' ? '' : 'faded'}">${val == null ? '—' : fmtBRL(val)}</td>
+      <td class="c-status"><span class="st ${st.cls}">${st.label}</span>${a.note ? `<small class="st-note">${esc(a.note)}</small>` : ''}</td>
+      <td class="c-actions">${actions}</td>
+    </tr>`;
+  }).join('');
+  const okPts = rows.filter(a => a.status === 'aprovada').reduce((x, a) => x + a.pts, 0);
+  return `<section class="sheet-block" style="--pc:${p.color}">
+    <header class="sb-head" data-toggle="${p.id}">
+      ${avatar(p)}
+      <div class="sb-name"><b>${esc(p.name)}</b><span>${p.regime}${p.email ? ' · ' + esc(p.email) : ''}</span></div>
+      <div class="sb-stats">
+        <span><small>clientes</small><b>${s.clients}</b></span>
+        <span><small>aprovados</small><b>${fmtPts(s.points)} pts</b></span>
+        <span class="${pendN ? 'warn' : ''}"><small>aguardando</small><b>${pendN}</b></span>
+        <span><small>online</small><b>${fmtDur(s.minutes)}</b></span>
+        <span><small>bônus</small><b>${fmtMult(s.mult)}</b></span>
+        <span class="sb-pay"><small>a receber</small><b>${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</b></span>
       </div>
-    </div>
-    <div class="mr-pts">${admin ? `<input type="number" min="0" step="0.25" data-tf="${t.id}|pts" value="${t.pts}">` : `<b>${fmtPts(t.pts)}</b>`}<span class="mono">pt</span></div>
-  </li>`).join('');
-
-  const tiers = [...st.tiers].sort((a, b) => a.h - b.h);
-  const tierHtml = tiers.map((t, i) => `<div class="tier" style="--lvl:${i}">
-    ${admin ? `<label class="mono">a partir de<input type="number" min="0" step="0.5" data-tier="${i}|h" value="${t.h}">h/dia</label><label class="tm">×<input type="number" min="0" step="0.05" data-tier="${i}|mult" value="${t.mult}"></label>${tiers.length > 1 ? `<button class="x sm" data-del-tier="${i}" aria-label="remover faixa">×</button>` : ''}`
-            : `<span class="mono">${t.h ? `${fmtNum(t.h)}h+ por dia` : 'base'}</span><b>${fmtMult(t.mult)}</b>`}
-  </div>`).join('');
-
-  // simulador
-  const simPts = st.itemTypes.reduce((s, t) => s + (ui.sim[t.id] || 0) * t.pts, 0);
-  const simMult = multFor(ui.sim.h || 0);
-  const simRows = st.itemTypes.map(t => `<div class="sim-row" style="--tc:${t.color}"><i></i><span>${esc(t.label)}</span><button class="ct" data-sim="${t.id}|-1">−</button><b class="mono">${ui.sim[t.id] || 0}</b><button class="ct" data-sim="${t.id}|1">+</button></div>`).join('');
-
-  return `<section class="page">
-    <div class="page-head"><span class="solid big as-label">${ico('pontos')}Quanto vale cada coisa</span><span class="vsep"></span><span class="pill-note">${admin ? 'Você pode editar tudo nesta tela' : 'Só a gestão edita'}</span></div>
-    <div class="grid-pts">
-      <div class="card menu">
-        ${cardHead('Tabela de pontos', `ex.: logo + ${ex?.max || 0} variações livres = ${fmtPts(exPts)} pts no 1º envio`)}
-        <ul class="menu-list">${rows}</ul>
-        ${admin ? '<button class="ghost sm add-type" data-add-type>+ novo tipo de tarefa</button>' : ''}
-      </div>
-      <div class="col">
-        <div class="card ink-card">
-          ${cardHead('Valor do ponto', 'quanto cada ponto paga, antes do bônus')}
-          <div class="pv">${admin ? `<span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}">` : `<b>${fmtBRL(st.pointValue)}</b>`}<small class="mono">por ponto</small></div>
-        </div>
-        <div class="card">
-          ${cardHead('Bônus por tempo online', 'quem fica mais tempo online ganha mais por ponto')}
-          <div class="tiers">${tierHtml}</div>
-          ${admin ? '<button class="ghost sm" data-add-tier>+ faixa</button>' : ''}
-          <p class="muted small">Conta a média de horas online por dia trabalhado no período. Ex.: média de ${fmtNum(tiers[tiers.length - 1]?.h || 0)}h por dia → cada ponto vale ${fmtBRL(st.pointValue * (tiers[tiers.length - 1]?.mult || 1))}.</p>
-        </div>
-      </div>
-    </div>
-    <div class="card sim">
-      ${cardHead('Simulador', 'monte um cliente e veja quanto rende')}
-      <div class="sim-grid">
-        <div class="sim-rows">${simRows}
-          <div class="sim-row h"><i></i><span>média online por dia</span><button class="ct" data-sim="h|-1">−</button><b class="mono">${ui.sim.h}h</b><button class="ct" data-sim="h|1">+</button></div>
-        </div>
-        <div class="sim-out">
-          <div><span class="mono">pontos</span><b>${fmtPts(simPts)}</b></div>
-          <div><span class="mono">bônus</span><b>${fmtMult(simMult)}</b></div>
-          <div class="big"><span class="mono">rende</span><b>${fmtBRL(simPts * st.pointValue * simMult)}</b></div>
-          ${ex && ex.max && (ui.sim.var_livre || 0) > ex.max ? `<p class="warn mono">no sistema, só ${ex.max} variações livres contam por cliente</p>` : ''}
-        </div>
-      </div>
-    </div>
+      ${admin && pendN ? `<button class="solid sm approve-all" data-approve-all="${p.id}">${ico('check')}Aprovar ${pendN}</button>` : ''}
+      <span class="sb-chev ${closed ? '' : 'open'}">⌄</span>
+    </header>
+    ${closed ? '' : `<div class="sheet-wrap"><table class="sheet acts">
+      <thead><tr><th class="rn">#</th><th>Data</th><th>Hora</th><th>Cliente</th><th>Atividade</th><th class="num">Pontos</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead>
+      <tbody>${body || `<tr><td colspan="9" class="empty-row">${admin ? 'Nenhuma atividade' : 'Você ainda não lançou nada'} ${ui.status !== 'todas' ? 'com esse status ' : ''}neste período.</td></tr>`}</tbody>
+      ${rows.length ? `<tfoot><tr><td></td><td colspan="4">${rows.length} atividade${rows.length === 1 ? '' : 's'} · aprovadas somam ${fmtPts(okPts)} pts${rate != null ? ` · ponto a ${fmtBRL(rate)} (${fmtBRL(S.settings.pointValue)} × ${fmtNum(s.mult, 2)})` : ''}</td><td class="num">${fmtPts(okPts)}</td><td class="num money">${rate == null ? '—' : fmtBRL(okPts * rate)}</td><td colspan="2"></td></tr></tfoot>` : ''}
+    </table></div>`}
   </section>`;
 }
 
@@ -797,94 +266,208 @@ function viewPontos() {
    EQUIPE (admin)
    ============================================================ */
 function viewEquipe() {
-  const ppl = S.people.map(p => {
-    const on = isOnlineNow(p.id);
-    return `<article class="person" style="--pc:${p.color}">
+  const st = S.settings;
+  const ppl = designers().map(p => `<article class="person" style="--pc:${p.color}">
       ${avatar(p, 'xl')}
       <div class="p-info">
-        <span class="reg ${p.regime}">${p.role === 'admin' ? 'ADMIN' : p.regime}</span>
+        <span class="reg ${p.regime}">${p.regime}</span>
         <h3>${esc(p.name)}</h3>
-        <p class="mono">${p.email ? esc(p.email) : 'sem e-mail'}</p>
-        ${p.role === 'designer' ? `<div class="p-tg">
-          <label class="switch sm"><input type="checkbox" data-pay="${p.id}" ${p.payByPoints ? 'checked' : ''}><i></i>recebe por pontos</label>
-          <label class="switch sm"><input type="checkbox" data-admin-online="${p.id}" ${on ? 'checked' : ''}><i></i>${on ? 'online' : 'offline'}</label>
-        </div>` : ''}
-        <div class="p-act"><button class="ghost sm" data-edit="${p.id}">editar</button>${p.id !== me().id ? `<button class="ghost sm danger" data-del="${p.id}">remover</button>` : ''}</div>
+        <p>${p.email ? esc(p.email) : 'sem e-mail'}</p>
+        <label class="switch sm"><input type="checkbox" data-pay="${p.id}" ${p.payByPoints ? 'checked' : ''}><i></i>recebe por pontos</label>
+        <div class="p-act"><button class="ghost sm" data-edit-person="${p.id}">editar</button><button class="ghost sm danger" data-del-person="${p.id}">remover</button></div>
       </div>
-    </article>`;
-  }).join('');
+    </article>`).join('');
 
-  const example = JSON.stringify({ lulu_id: 48311, cliente: 'Academia Ponta Negra', vendedor: 'Rafa', modelo: 'Trucker', designer: 'lia@seubone.com', itens: [{ tipo: 'logo', qtd: 1 }] }, null, 2);
+  const rows = st.itemTypes.map(t => `<li class="menu-row" style="--tc:${t.color}">
+    <span class="mr-dot"></span>
+    <div class="mr-main">
+      <input class="mr-label" data-tf="${t.id}|label" value="${esc(t.label)}">
+      <input class="mr-hint" data-tf="${t.id}|hint" value="${esc(t.hint || '')}" placeholder="descrição">
+      <div class="mr-rules"><label>limite por cliente <input type="number" min="0" step="1" data-tf="${t.id}|max" value="${t.max || ''}" placeholder="∞"></label>
+        <label class="clr"><input type="color" data-tf="${t.id}|color" value="${t.color}"></label>
+        ${t.id === 'logo' ? '' : `<button class="ghost sm danger" data-del-type="${t.id}">remover</button>`}</div>
+    </div>
+    <div class="mr-pts"><input type="number" min="0" step="0.25" data-tf="${t.id}|pts" value="${t.pts}"><span>pt</span></div>
+  </li>`).join('');
+  const tiers = [...st.tiers].sort((a, b) => a.h - b.h).map((t, i, arr) => `<div class="tier" style="--lvl:${i}">
+    <label>a partir de<input type="number" min="0" step="0.5" data-tier="${i}|h" value="${t.h}">h/dia</label>
+    <label class="tm">×<input type="number" min="0" step="0.05" data-tier="${i}|mult" value="${t.mult}"></label>
+    ${arr.length > 1 ? `<button class="x sm" data-del-tier="${i}" aria-label="remover faixa">×</button>` : ''}
+  </div>`).join('');
+
   return `<section class="page">
-    <div class="page-head"><button class="solid big" data-add-person>${ico('plus')}Nova pessoa</button><span class="vsep"></span><span class="pill-note">${designers().length} designers · ${S.people.length - designers().length} admin</span></div>
-    <div class="team">${ppl}</div>
-    <div class="grid-2">
-      <div class="card">
-        ${cardHead('Integração com o lulu', 'como os clientes entram sozinhos')}
-        <p class="small">Quando um designer pega um cliente no lulu, o lulu manda os dados para cá e o card aparece pronto. O designer só marca o que fez. O designer é reconhecido pelo <b>nome</b> ou <b>e-mail</b> cadastrado aqui.</p>
-        <p class="small muted">Enquanto o lulu não estiver ligado, cole aqui o JSON (um cliente ou uma lista) para testar:</p>
-        <textarea class="code" id="luluJson" rows="9" spellcheck="false">${esc(example)}</textarea>
-        <div class="btns"><button class="solid sm" data-lulu-import>receber</button><button class="ghost sm" data-sim-lulu>simular cliente aleatório</button></div>
+    <div class="page-head"><button class="solid big" data-add-person>${ico('plus')}Novo designer</button><span class="vsep"></span><span class="pill-note">Tudo aqui é editável e vale na hora</span></div>
+    <div class="team">${ppl || '<div class="empty-state"><p>Nenhum designer cadastrado ainda.</p></div>'}</div>
+    <div class="grid-pts">
+      <div class="card menu">
+        <div class="card-head"><h3>Tabela de pontos</h3><span>o designer escolhe a atividade e o ponto já vem calculado</span></div>
+        <ul class="menu-list">${rows}</ul>
+        <button class="ghost sm add-type" data-add-type>${ico('plus')}novo tipo de atividade</button>
       </div>
       <div class="col">
-        <div class="card">
-          ${cardHead('Regras do turno', '')}
-          <label class="switch"><input type="checkbox" data-setting-bool="weekendNight" ${S.settings.weekendNight ? 'checked' : ''}><i></i>escala noturna também no fim de semana</label>
-          <p class="muted small mono">CLT ${H().start}h–${H().end}h com almoço ${H().lunch}h–${H().lunch + 1}h · PJ ${H().start}h–${H().end}h direto · noite ${H().end}h–${H().nightEnd}h</p>
+        <div class="card ink-card">
+          <div class="card-head"><h3>Valor do ponto</h3><span>antes do bônus</span></div>
+          <div class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"><small>por ponto</small></div>
         </div>
         <div class="card">
-          ${cardHead('Dados', 'modo demonstração')}
-          <div class="btns"><button class="ghost sm" data-io="export">exportar .json</button><button class="ghost sm" data-io="import">importar</button><button class="ghost sm" data-io="demo">recarregar exemplo</button><button class="ghost sm danger" data-io="reset">zerar tudo</button></div>
+          <div class="card-head"><h3>Bônus por horas online</h3><span>média de horas por dia trabalhado</span></div>
+          <div class="tiers">${tiers}</div>
+          <button class="ghost sm" data-add-tier>${ico('plus')}faixa</button>
+          <p class="muted small">Valor a receber = pontos aprovados × ${fmtBRL(st.pointValue)} × bônus.</p>
         </div>
         <div class="card">
-          ${cardHead('Registro da gestão', 'últimas ações')}
-          <ul class="log">${S.log.slice(0, 8).map(l => { const d = new Date(l.at); return `<li><span class="mono">${d.getDate()} ${MES[d.getMonth()]} ${hm(d)}</span>${esc(l.text)}</li>`; }).join('') || '<li class="muted">nada ainda</li>'}</ul>
+          <div class="card-head"><h3>Dados</h3><span>modo demonstração · salvos neste navegador</span></div>
+          <div class="btns"><button class="ghost sm" data-io="export">exportar .json</button><button class="ghost sm" data-io="import">importar</button><button class="ghost sm" data-io="demo">carregar exemplo</button><button class="ghost sm danger" data-io="reset">zerar tudo</button></div>
         </div>
       </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Registro da gestão</h3><span>últimas ações</span></div>
+      <ul class="log">${S.log.slice(0, 12).map(l => { const d = new Date(l.at); return `<li><span>${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${hm(d)}</span>${esc(l.text)}</li>`; }).join('') || '<li class="muted">nada ainda</li>'}</ul>
     </div>
   </section>`;
 }
 
 /* ============================================================
+   MÉTRICAS (admin)
+   ============================================================ */
+function viewMetricas() {
+  const { from, to, label } = period();
+  const all = designers().map(p => ({ p, s: stats(p.id, from, to) }));
+  if (!all.length) return `<section class="page"><div class="page-head">${periodCtl()}</div><div class="empty-state"><p>Cadastre designers em Equipe para ver as métricas.</p></div></section>`;
+  const tot = all.reduce((t, { s }) => ({ pay: t.pay + (s.pay || 0), pts: t.pts + s.points, pend: t.pend + s.pending, pendPts: t.pendPts + s.pendingPts, clients: t.clients + s.clients, min: t.min + s.minutes, err: t.err + s.errors + s.refused, acts: t.acts + s.acts.length }), { pay: 0, pts: 0, pend: 0, pendPts: 0, clients: 0, min: 0, err: 0, acts: 0 });
+  const kpi = (l, v, sub, tone = '') => `<div class="kpi ${tone}"><span>${l}</span><b>${v}</b><small>${sub}</small></div>`;
+  const lb = (title, sub, key, fmt) => {
+    const list = [...all].sort((a, b) => key(b.s) - key(a.s)), max = Math.max(1e-9, ...list.map(x => key(x.s)));
+    return `<div class="card lb"><div class="card-head"><h3>${title}</h3><span>${sub}</span></div><ol>${list.map(({ p, s }, i) => `<li class="${i === 0 && key(s) > 0 ? 'first' : ''}"><span class="lb-pos">${i + 1}</span>${avatar(p, 'sm')}<span class="lb-name">${esc(firstName(p.name))}</span><span class="lb-bar"><i style="width:${key(s) / max * 100}%;background:${p.color}"></i></span><b>${fmt(s)}</b></li>`).join('')}</ol></div>`;
+  };
+  const table = `<div class="card flush">
+    <div class="card-head"><h3>Fechamento</h3><span>${esc(label)} · só atividades aprovadas entram no valor</span></div>
+    <div class="table-wrap"><table class="sheet close-t">
+      <thead><tr><th>Designer</th><th class="num">Pontos</th><th class="num">Aguardando</th><th class="num">Clientes</th><th class="num">Clientes/dia</th><th class="num">Pts/cliente</th><th class="num">Online</th><th class="num">Média/dia</th><th class="num">Bônus</th><th class="num">Erros</th><th class="num">A pagar</th></tr></thead>
+      <tbody>${[...all].sort((a, b) => b.s.points - a.s.points).map(({ p, s }) => `<tr>
+        <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
+        <td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending ? `${s.pending} (${fmtPts(s.pendingPts)} pts)` : '—'}</td>
+        <td class="num">${s.clients}</td><td class="num">${fmtNum(s.clientsPerDay)}</td><td class="num">${fmtNum(s.ptsPerClient)}</td>
+        <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.avgH)}h</td><td class="num"><span class="mult">${fmtMult(s.mult)}</span></td>
+        <td class="num">${s.errors + s.refused || '—'}</td><td class="num money">${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td class="num">${tot.clients}</td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num">${tot.err || '—'}</td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>
+    </table></div>
+  </div>`;
+  return `<section class="page">
+    <div class="page-head"><button class="solid big" data-export-csv>${ico('sheet')}Exportar planilha</button><span class="vsep"></span>${periodCtl()}</div>
+    ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${tot.pend} atividade${tot.pend === 1 ? '' : 's'} aguardando aprovação</b> · ${fmtPts(tot.pendPts)} pts que ainda não entram no valor</span><em>conferir agora →</em></button>` : ''}
+    <div class="kpis">
+      ${kpi('gasto no período', fmtBRL(tot.pay), `${fmtBRL(tot.clients ? tot.pay / tot.clients : 0)} por cliente`, 'ink')}
+      ${kpi('pontos aprovados', fmtPts(tot.pts), `${tot.acts} atividades lançadas`)}
+      ${kpi('clientes atendidos', tot.clients, `${fmtNum(tot.clients ? tot.pts / tot.clients : 0)} pts por cliente`)}
+      ${kpi('horas online', fmtDur(tot.min), `${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h por designer`)}
+    </div>
+    <div class="lb-grid">
+      ${lb('Mais tempo online', 'horas lançadas', s => s.minutes, s => fmtDur(s.minutes))}
+      ${lb('Mais clientes', 'clientes atendidos', s => s.clients, s => `${s.clients}`)}
+      ${lb('Gasto por designer', 'a receber', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay))}
+      ${lb('Mais pontos por cliente', 'capricho na entrega', s => s.ptsPerClient, s => fmtNum(s.ptsPerClient))}
+    </div>
+    <div class="grid-2">
+      <div class="card">${chart(all, from, to)}</div>
+      <div class="card">${breakdown(all)}</div>
+    </div>
+    ${table}
+  </section>`;
+}
+
+function chart(all, from, to) {
+  const days = [];
+  for (let d = parseKey(from); dkey(d) <= to; d = addDays(d, 1)) if (!isWeekendDate(d) || all.some(({ s }) => s.perDay[dkey(d)])) days.push(dkey(d));
+  const sums = days.map(k => all.reduce((s, x) => s + (x.s.perDay[k] || 0), 0));
+  const max = Math.max(1, ...sums);
+  const mag = Math.pow(10, Math.floor(Math.log10(max / 4)));
+  const step = [1, 2, 2.5, 5, 10, 20].map(x => x * mag).find(x => Math.ceil(max / x) <= 5);
+  const lines = Math.max(1, Math.ceil(max / step)), top = step * lines;
+  const W = 640, Hh = 240, pl = 34, pb = 24, pt = 8, iw = W - pl - 6, ih = Hh - pb - pt, bw = iw / Math.max(1, days.length), gap = Math.min(10, bw * .3);
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none">`;
+  for (let g = 0; g <= lines; g++) { const y = pt + ih - ih * g / lines; svg += `<line x1="${pl}" x2="${W - 6}" y1="${y}" y2="${y}" class="grid-l"/><text x="${pl - 6}" y="${y + 3}" class="ax" text-anchor="end">${fmtPts(step * g)}</text>`; }
+  days.forEach((k, i) => {
+    let y = pt + ih; const x = pl + i * bw + gap / 2, w = Math.max(2, bw - gap);
+    all.forEach(({ p, s }) => { const v = s.perDay[k] || 0; if (!v) return; const h = ih * v / top; y -= h; svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0, h - 1.5).toFixed(1)}" rx="3" fill="${p.color}"><title>${esc(p.name)} · ${fmtDay(k)}: ${fmtPts(v)} pts</title></rect>`; });
+    if (days.length <= 16 || i % Math.ceil(days.length / 16) === 0) svg += `<text x="${(x + w / 2).toFixed(1)}" y="${Hh - 6}" class="ax" text-anchor="middle">${days.length <= 7 ? WD[parseKey(k).getDay()] : parseKey(k).getDate()}</text>`;
+  });
+  svg += '</svg>';
+  return `<div class="card-head"><h3>Pontos aprovados por dia</h3></div>${svg}<div class="chart-leg">${all.map(({ p }) => `<span><i style="background:${p.color}"></i>${esc(firstName(p.name))}</span>`).join('')}</div>`;
+}
+function breakdown(all) {
+  const by = {}; all.forEach(({ s }) => Object.entries(s.byType).forEach(([k, v]) => { by[k] = (by[k] || 0) + v; }));
+  const total = Object.values(by).reduce((a, b) => a + b, 0);
+  const keys = Object.keys(by).sort((a, b) => by[b] - by[a]);
+  return `<div class="card-head"><h3>De onde vêm os pontos</h3><span>por tipo de atividade</span></div>
+    ${total ? `<div class="stackbar">${keys.map(k => `<i style="width:${by[k] / total * 100}%;background:${typeOf(k).color}"></i>`).join('')}</div>
+    <ul class="bd-list">${keys.map(k => `<li style="--tc:${typeOf(k).color}"><i></i><span>${k === 'extra' ? 'Atividades extras' : esc(typeOf(k).label)}</span><small></small><b>${fmtPts(by[k])} pts</b><em>${Math.round(by[k] / total * 100)}%</em></li>`).join('')}</ul>` : '<p class="muted">Nenhum ponto aprovado no período.</p>'}`;
+}
+
+function exportCSV() {
+  const { from, to, label } = period();
+  const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [['Designer', 'Regime', 'Data', 'Hora', 'Cliente', 'Nº lulu', 'Atividade', 'Qtd', 'Pontos', 'Status', 'Comentário da gestão', 'Valor (R$)'].join(';')];
+  for (const p of designers()) {
+    const s = stats(p.id, from, to), rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
+    for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
+      const d = parseKey(a.date);
+      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), a.luluId, q(a.extra ? 'Extra: ' + a.desc : typeOf(a.type).label), a.qty, n(a.pts), STATUS[a.status].label, q(a.note), rate != null && a.status === 'aprovada' ? n((a.pts * rate).toFixed(2)) : ''].join(';'));
+    }
+  }
+  const el = document.createElement('a');
+  el.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  el.download = `dede-${label.replace(/[^\wÀ-ú]+/g, '-')}.csv`;
+  document.body.appendChild(el); el.click(); el.remove();
+  toast(`Planilha exportada · ${lines.length - 1} linhas`);
+}
+
+/* ============================================================
    dialogs
    ============================================================ */
-let editingPerson = null, shiftCtx = null;
-function openCardDlg() {
-  const F = $('#cardForm').elements, m = me();
-  F.designerId.innerHTML = (isAdmin() ? '<option value="">— sem designer (fila) —</option>' : '') + designers().filter(p => isAdmin() || p.id === m.id).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  F.client.value = ''; F.model.value = ''; F.seller.value = ''; F.luluId.value = '';
-  if (!isAdmin()) F.designerId.value = m.id;
-  $('#cardErr').textContent = '';
-  $('#cardDlg').showModal(); setTimeout(() => F.client.focus(), 40);
+let actCtx = null, editingPerson = null;
+function openAct(mode, a) {
+  const admin = isAdmin(), m = me();
+  actCtx = { mode, id: a ? a.id : null };
+  const F = $('#actForm').elements;
+  const types = S.settings.itemTypes.map(t => `<option value="${t.id}">${esc(t.label)} · ${fmtPts(t.pts)} pt</option>`).join('') + (admin ? '<option value="extra">Atividade extra (pontos livres)</option>' : '');
+  F.type.innerHTML = types;
+  F.designerId.innerHTML = designers().map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  $('#actWho').hidden = !admin;
+  $('#actAdmin').hidden = !admin;
+  const now = new Date();
+  const x = a || { designerId: admin ? (ui.who !== 'all' ? ui.who : designers()[0]?.id) : m.id, date: dkey(ui.period === 'dia' ? ui.day : now), time: hm(now), client: '', luluId: '', type: admin && mode === 'extra' ? 'extra' : 'logo', qty: 1, pts: admin && mode === 'extra' ? 1 : suggestedPts('logo', 1), status: admin ? 'aprovada' : 'pendente', note: '', desc: '' };
+  F.designerId.value = x.designerId || ''; F.date.value = x.date; F.time.value = x.time || ''; F.client.value = x.client || ''; F.luluId.value = x.luluId || '';
+  F.type.value = x.extra ? 'extra' : x.type; F.qty.value = x.qty || 1; F.pts.value = x.pts; F.desc.value = x.desc || '';
+  F.status.value = x.status; F.note.value = x.note || '';
+  F.pts.readOnly = !admin;
+  const titles = { new: 'Nova atividade', extra: 'Atividade extra', edit: admin ? 'Editar atividade' : (a && a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar atividade'), erro: 'Apontar erro', recusada: 'Recusar atividade' };
+  $('#actTitle').textContent = titles[mode] || 'Atividade';
+  if (mode === 'erro' || mode === 'recusada') { F.status.value = mode; }
+  $('#actErr').textContent = '';
+  $('#actHint').textContent = mode === 'erro' ? 'Explique o erro. Se quiser, já corrija a pontuação. O designer vê o comentário e pode reenviar.' : mode === 'recusada' ? 'Diga o motivo. Atividade recusada não entra no valor.' : (!admin ? 'A pontuação vem da tabela. A gestão confere e aprova.' : '');
+  $('#delAct').hidden = !(admin && a);
+  syncActPts();
+  $('#actDlg').showModal();
+  (mode === 'erro' || mode === 'recusada' ? F.note : F.client).focus();
 }
+function syncActPts(force) {
+  const F = $('#actForm').elements;
+  const extra = F.type.value === 'extra';
+  if (!isAdmin() || force) F.pts.value = extra ? (F.pts.value || 1) : suggestedPts(F.type.value, +F.qty.value || 1);
+}
+
 function openPerson(p) {
   editingPerson = p || null;
   const F = $('#personForm').elements;
   const used = new Set(S.people.map(x => x.color));
   const color = p ? p.color : (PALETTE.find(c => !used.has(c)) || PALETTE[0]);
-  $('#swatches').innerHTML = [...PALETTE, '#17140F'].map(c => `<label><input type="radio" name="color" value="${c}" ${c === color ? 'checked' : ''}><i style="--c:${c}"></i></label>`).join('');
-  F.name.value = p ? p.name : '';
-  F.regime.value = p ? (p.role === 'admin' ? 'ADM' : p.regime) : 'PJ';
-  F.email.value = p ? (p.email || '') : '';
-  F.payByPoints.checked = p ? !!p.payByPoints : true;
-  $('#pEyebrow').textContent = p ? 'editar pessoa' : 'nova pessoa';
+  $('#swatches').innerHTML = PALETTE.map(c => `<label><input type="radio" name="color" value="${c}" ${c === color ? 'checked' : ''}><i style="--c:${c}"></i></label>`).join('');
+  F.name.value = p ? p.name : ''; F.regime.value = p ? p.regime : 'PJ'; F.email.value = p ? (p.email || '') : ''; F.payByPoints.checked = p ? !!p.payByPoints : true;
+  $('#pEyebrow').textContent = p ? 'editar designer' : 'novo designer';
   $('#personErr').textContent = '';
-  $('#personDlg').showModal(); setTimeout(() => F.name.focus(), 40);
-}
-function openShift(k, h) {
-  const m = me();
-  if (!isAdmin()) { // designer: alterna a si mesmo
-    const on = !shiftIds(k, h).includes(m.id);
-    toggleShift(k, h, m.id, on); save(); render();
-    toast(on ? `Você disse que fica ${pad(h)}h–${pad(h + 1)}h` : `Você saiu da escala ${pad(h)}h–${pad(h + 1)}h`);
-    return;
-  }
-  shiftCtx = { k, h };
-  const d = parseKey(k), ids = shiftIds(k, h);
-  $('#shiftTitle').innerHTML = `<em>${WDL[d.getDay()]} ${d.getDate()} ${MES[d.getMonth()]}</em> · ${pad(h)}h–${pad(h + 1)}h`;
-  $('#shiftPeople').innerHTML = designers().map(p => `<label style="--pc:${p.color}"><input type="checkbox" name="who" value="${p.id}" ${ids.includes(p.id) ? 'checked' : ''}>${avatar(p, 'sm')}<span>${esc(p.name)}</span><small class="mono">${p.regime}</small></label>`).join('');
-  $('#shiftForm').elements.allNight.checked = false;
-  $('#shiftDlg').showModal();
+  $('#personDlg').showModal(); F.name.focus();
 }
 
 /* ============================================================
@@ -892,20 +475,16 @@ function openShift(k, h) {
    ============================================================ */
 let tt;
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2800); }
-const findCard = el => { const a = el.closest('[data-card]'); return a ? S.cards.find(c => c.id === a.dataset.card) : null; };
-
-function simulateLulu() {
-  const pick = a => a[Math.floor(Math.random() * a.length)];
-  const online = designers().filter(p => isOnlineNow(p.id));
-  const who = Math.random() < 0.75 && online.length ? pick(online) : null;
-  const n = Math.max(48300, ...S.cards.map(c => +c.luluId || 0)) + 1;
-  const [c] = receiveFromLulu({ lulu_id: n, cliente: `${pick(CLIENT_A)} ${pick(CLIENT_B)}`, vendedor: pick(SELLERS), modelo: pick(MODELS), designer: who ? who.name : null, itens: [{ tipo: 'logo', qtd: 1 }] });
-  save();
-  if (c) {
-    ui.view = 'cards'; ui.cardTab = c.status; ui.q = '';
-    render();
-    toast(`lulu #${c.luluId}: ${c.client} → ${who ? firstName(who.name) : 'sem designer'}`);
-  }
+const act = id => S.activities.find(a => a.id === id);
+function setStatus(a, status, note) {
+  a.status = status; if (note != null) a.note = note;
+  const p = person(a.designerId);
+  addLog(`${STATUS[status].label.toLowerCase()}: ${p ? firstName(p.name) : '?'} · ${a.client || 'extra'} · ${typeOf(a.type).label} (${fmtPts(a.pts)} pts)`);
+}
+function rerenderKeepFocus(sel) {
+  const el = document.activeElement, pos = el && el.selectionStart;
+  render();
+  const n = $(sel); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} }
 }
 
 function bind() {
@@ -913,228 +492,169 @@ function bind() {
     const t = e.target; let el;
     if (t.closest('dialog')) return;
     if ((el = t.closest('#nav [data-view]'))) { ui.view = el.dataset.view; render(); scrollTo(0, 0); return; }
-    if ((el = t.closest('[data-go]'))) { ui.view = el.dataset.go; render(); scrollTo(0, 0); return; }
-    if ((el = t.closest('[data-sort]'))) { const k = el.dataset.sort; if (ui.sheet.sort === k) ui.sheet.dir *= -1; else { ui.sheet.sort = k; ui.sheet.dir = k === 'client' || k === 'type' ? 1 : -1; } render(); return; }
-    if ((el = t.closest('[data-toggle-group]'))) { const id = el.dataset.toggleGroup; ui.sheet.closed[id] = !ui.sheet.closed[id]; render(); return; }
-    if (t.closest('[data-toggle-all]')) { const ppl = sheetPeople(); const close = !ppl.every(p => ui.sheet.closed[p.id]); ppl.forEach(p => { ui.sheet.closed[p.id] = close; }); render(); return; }
-    if ((el = t.closest('[data-more-rows]'))) { const id = el.dataset.moreRows; ui.sheet.limit[id] = (ui.sheet.limit[id] || 40) + 100; render(); return; }
-    if (t.closest('[data-export-csv]')) { exportCSV(); return; }
     if ((el = t.closest('[data-period]'))) { ui.period = el.dataset.period; render(); return; }
-    if ((el = t.closest('[data-online-self]'))) {
-      const m = me();
-      if (el.dataset.onlineSelf === 'on') { goOnline(m.id, 'self'); toast('Você está online'); } else { goOffline(m.id, 'self'); toast('Você ficou offline'); }
-      save(); render(); return;
+    if ((el = t.closest('[data-shift]'))) { shiftPeriod(+el.dataset.shift); render(); return; }
+    if ((el = t.closest('[data-status]'))) { ui.status = el.dataset.status; render(); return; }
+    if (t.closest('[data-new]')) { if (isAdmin() && !designers().length) { openPerson(); return; } openAct(isAdmin() ? 'extra' : 'new'); return; }
+    if ((el = t.closest('[data-approve-all]'))) {
+      const { from, to } = period();
+      const list = S.activities.filter(a => a.designerId === el.dataset.approveAll && a.status === 'pendente' && inRange(a.date, from, to));
+      list.forEach(a => { a.status = 'aprovada'; });
+      addLog(`aprovou ${list.length} atividades de ${firstName(person(el.dataset.approveAll).name)}`);
+      save(); render(); toast(`${list.length} atividades aprovadas`); return;
     }
-    // cards
-    if ((el = t.closest('[data-cardtab]'))) { ui.cardTab = el.dataset.cardtab; ui.shownDone = 40; render(); return; }
-    if ((el = t.closest('[data-cardwho-btn]'))) { ui.cardWho = el.dataset.cardwhoBtn; render(); return; }
-    if (t.closest('[data-more]')) { ui.shownDone += 40; render(); return; }
-    if (t.closest('[data-new-card]')) { openCardDlg(); return; }
-    if (t.closest('[data-sim-lulu]')) { simulateLulu(); return; }
-    if ((el = t.closest('[data-ent]'))) {
-      const c = findCard(el); if (!c) return;
-      const en = c.entries.find(x => x.id === el.dataset.ent); if (!en) return;
-      en.status = el.dataset.to; en.at = new Date().toISOString();
-      save(); render(); return;
-    }
-    if ((el = t.closest('[data-inc]'))) {
-      const c = findCard(el); if (!c) return;
-      const err = addEntry(c, el.dataset.inc, 'feito');
-      if (err) toast(err); else { save(); render(); }
-      return;
-    }
-    if ((el = t.closest('[data-dec]'))) {
-      const c = findCard(el); if (!c) return;
-      const list = c.entries.filter(x => x.type === el.dataset.dec && x.status === 'feito');
-      const last = list.filter(x => x.round === c.round).pop() || list.pop();
-      if (last) { c.entries = c.entries.filter(x => x !== last); save(); render(); }
-      return;
-    }
-    if ((el = t.closest('[data-round]'))) {
-      const c = findCard(el); if (!c) return;
-      c.round++; save(); render(); toast(`${c.client}: ${c.round}ª entrega aberta`); return;
-    }
-    if ((el = t.closest('[data-deliver]'))) {
-      const c = findCard(el); if (!c) return;
-      if (c.entries.some(x => x.status === 'pendente')) { toast('Marque ✓ ou ✕ nos itens que estão aguardando.'); return; }
-      c.status = 'entregue'; save(); render(); toast(`${c.client} entregue · ${fmtPts(cardPts(c))} pts`); return;
-    }
-    if ((el = t.closest('[data-reopen]'))) { const c = findCard(el); if (c) { c.status = 'fazendo'; save(); render(); } return; }
-    if ((el = t.closest('[data-take]'))) {
-      const c = findCard(el); if (!c) return;
-      c.designerId = me().id; c.status = 'fazendo'; save(); ui.cardTab = 'fazendo'; render(); toast(`${c.client} é seu`); return;
-    }
-    // turno
-    if ((el = t.closest('[data-dayshift]'))) { const n = +el.dataset.dayshift; ui.day = n ? addDays(ui.day, n) : new Date(); render(); return; }
-    if ((el = t.closest('[data-day]'))) { ui.day = parseKey(el.dataset.day); render(); return; }
-    if ((el = t.closest('[data-shift-open]'))) { openShift(el.dataset.shiftOpen, +el.dataset.h); return; }
-    if ((el = t.closest('[data-rot]'))) { ui.rotation = el.dataset.rot; render(); return; }
-    if ((el = t.closest('[data-gen]'))) {
-      const ws = startOfWeek(ui.day), days = range(0, 7).map(i => addDays(ws, i));
-      if (el.dataset.gen === 'clear') { if (!confirm('Limpar a escala noturna desta semana?')) return; days.forEach(d => delete S.shifts[dkey(d)]); save(); render(); return; }
-      const n = fillShifts(days, ui.rotation); save(); render(); toast(n < 0 ? 'Nenhum PJ cadastrado.' : n ? `${n} horas escaladas` : 'Já está tudo escalado.'); return;
-    }
-    // pontuação
-    if ((el = t.closest('[data-sim]'))) {
-      const [id, d] = el.dataset.sim.split('|'); ui.sim[id] = Math.max(0, (ui.sim[id] || 0) + +d); render(); return;
-    }
-    if (t.closest('[data-add-type]')) {
-      S.settings.itemTypes.push({ id: 't' + uid().slice(0, 5), label: 'Nova tarefa', pts: 0.5, max: null, firstOnly: false, color: PALETTE[S.settings.itemTypes.length % PALETTE.length], hint: '' });
-      save(); render(); return;
-    }
-    if ((el = t.closest('[data-del-type]'))) {
-      const id = el.dataset.delType;
-      const used = S.cards.some(c => c.entries.some(x => x.type === id));
-      if (used && !confirm('Esse tipo já tem pontos lançados. Remover mesmo assim? (os pontos lançados param de contar)')) return;
-      S.settings.itemTypes = S.settings.itemTypes.filter(x => x.id !== id); save(); render(); return;
-    }
-    if (t.closest('[data-add-tier]')) { const last = [...S.settings.tiers].sort((a, b) => a.h - b.h).pop() || { h: 0, mult: 1 }; S.settings.tiers.push({ h: last.h + 2, mult: Math.round((last.mult + 0.1) * 100) / 100 }); save(); render(); return; }
-    if ((el = t.closest('[data-del-tier]'))) { const sorted = [...S.settings.tiers].sort((a, b) => a.h - b.h); sorted.splice(+el.dataset.delTier, 1); S.settings.tiers = sorted; save(); render(); return; }
+    if ((el = t.closest('[data-toggle]'))) { if (t.closest('button') && t.closest('button') !== el) return; const id = el.dataset.toggle; ui.closed[id] = !ui.closed[id]; render(); return; }
+    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { setStatus(a, 'aprovada', ''); save(); render(); toast('Aprovada'); } return; }
+    if ((el = t.closest('[data-mark]'))) { const [id, st] = el.dataset.mark.split('|'); const a = act(id); if (a) openAct(st, a); return; }
+    if ((el = t.closest('[data-edit-act]'))) { const a = act(el.dataset.editAct); if (a) openAct('edit', a); return; }
+    if ((el = t.closest('[data-del-act]'))) { const a = act(el.dataset.delAct); if (a && confirm('Excluir esta atividade?')) { S.activities = S.activities.filter(x => x !== a); save(); render(); toast('Excluída'); } return; }
+    if (t.closest('[data-go-pending]')) { ui.view = 'atividades'; ui.status = 'pendente'; ui.who = 'all'; render(); scrollTo(0, 0); return; }
+    if (t.closest('[data-export-csv]')) { exportCSV(); return; }
     // equipe
     if (t.closest('[data-add-person]')) { openPerson(); return; }
-    if ((el = t.closest('[data-edit]'))) { openPerson(person(el.dataset.edit)); return; }
-    if ((el = t.closest('[data-del]'))) {
-      const p = person(el.dataset.del); if (!p) return;
-      if (!confirm(`Remover ${p.name}? Os cards dele(a) ficam sem designer e o histórico online é apagado.`)) return;
-      S.people = S.people.filter(x => x.id !== p.id);
-      S.cards.forEach(c => { if (c.designerId === p.id) c.designerId = null; });
-      S.sessions = S.sessions.filter(s => s.personId !== p.id);
-      Object.keys(S.shifts).forEach(k => Object.keys(S.shifts[k]).forEach(h => toggleShift(k, h, p.id, false)));
-      save(); render(); return;
+    if ((el = t.closest('[data-edit-person]'))) { openPerson(person(el.dataset.editPerson)); return; }
+    if ((el = t.closest('[data-del-person]'))) {
+      const p = person(el.dataset.delPerson); if (!p) return;
+      const n = S.activities.filter(a => a.designerId === p.id).length;
+      if (!confirm(`Remover ${p.name}?${n ? ` As ${n} atividades dele(a) também serão apagadas.` : ''}`)) return;
+      S.people = S.people.filter(x => x !== p); S.activities = S.activities.filter(a => a.designerId !== p.id);
+      Object.values(S.online).forEach(d => delete d[p.id]);
+      addLog(`removeu ${p.name}`); save(); render(); return;
     }
-    if (t.closest('[data-lulu-import]')) {
-      try {
-        const got = receiveFromLulu(JSON.parse($('#luluJson').value));
-        save(); render();
-        toast(got.length ? `${got.length} cliente(s) recebido(s) do lulu` : 'Nada novo (nº do lulu já existe?)');
-      } catch (err) { toast('JSON inválido'); }
-      return;
+    if (t.closest('[data-add-type]')) { S.settings.itemTypes.push({ id: 't' + uid().slice(0, 5), label: 'Nova atividade', pts: 0.5, max: null, color: PALETTE[S.settings.itemTypes.length % PALETTE.length], hint: '' }); save(); render(); return; }
+    if ((el = t.closest('[data-del-type]'))) {
+      const id = el.dataset.delType;
+      if (S.activities.some(a => a.type === id) && !confirm('Já existem atividades desse tipo. Remover mesmo assim? (elas continuam com os pontos que têm)')) return;
+      S.settings.itemTypes = S.settings.itemTypes.filter(x => x.id !== id); save(); render(); return;
     }
+    if (t.closest('[data-add-tier]')) { const l = [...S.settings.tiers].sort((a, b) => a.h - b.h).pop() || { h: 0, mult: 1 }; S.settings.tiers.push({ h: l.h + 2, mult: Math.round((l.mult + .1) * 100) / 100 }); save(); render(); return; }
+    if ((el = t.closest('[data-del-tier]'))) { const s = [...S.settings.tiers].sort((a, b) => a.h - b.h); s.splice(+el.dataset.delTier, 1); S.settings.tiers = s; save(); render(); return; }
     if ((el = t.closest('[data-io]'))) { io(el.dataset.io); return; }
   });
 
   document.addEventListener('change', e => {
     const t = e.target;
-    if (t.id === 'meSel') { ui.meId = t.value; localStorage.setItem('aba.me', ui.meId); ui.cardWho = 'me'; render(); toast(`Agora você está como ${me().name}`); return; }
-    if (t.matches('[data-admin-online]')) {
-      const id = t.dataset.adminOnline;
-      if (t.checked) goOnline(id, 'admin'); else goOffline(id, 'admin');
-      save(); render(); toast(`${firstName(person(id).name)} ${t.checked ? 'ligado(a)' : 'desligado(a)'} pela gestão`); return;
+    if (t.id === 'meSel') { ui.meId = t.value; localStorage.setItem('dede.me', ui.meId); ui.who = 'all'; render(); toast(`Agora você está como ${me().name}`); return; }
+    if (t.matches('[data-who]')) { ui.who = t.value; render(); return; }
+    if (t.matches('[data-online]')) {
+      const [pid, k] = t.dataset.online.split('|'), min = parseHM(t.value);
+      if (min > 24 * 60) { toast('Mais de 24h num dia? Confere o valor.'); t.value = toHM(onlineMin(pid, k)); return; }
+      setOnline(pid, k, min); addLog(`lançou ${fmtDur(min)} online para ${firstName(person(pid).name)} em ${fmtDay(k)}`);
+      save(); render(); toast(`${firstName(person(pid).name)}: ${min ? fmtDur(min) : 'sem horas'} em ${fmtDay(k)}`); return;
     }
-    if (t.matches('[data-sheet-who]')) { ui.sheet.who = t.value; render(); return; }
-    if (t.matches('[data-cardwho]')) { ui.cardWho = t.value; render(); return; }
-    if (t.matches('[data-assign]')) {
-      const c = findCard(t); if (!c || !t.value) return;
-      c.designerId = t.value; c.status = 'fazendo'; save(); render(); toast(`${c.client} → ${firstName(person(t.value).name)}`); return;
+    if (t.matches('[data-pts]')) {
+      const a = act(t.dataset.pts), v = parseFloat(String(t.value).replace(',', '.'));
+      if (a && !isNaN(v) && v >= 0) { const old = a.pts; a.pts = v; addLog(`ajustou pontos de ${firstName(person(a.designerId).name)} · ${a.client}: ${fmtPts(old)} → ${fmtPts(v)}`); save(); render(); toast('Pontuação ajustada'); }
+      return;
     }
     if (t.matches('[data-pay]')) { const p = person(t.dataset.pay); if (p) { p.payByPoints = t.checked; save(); render(); } return; }
     if (t.matches('[data-setting]')) { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) { S.settings[t.dataset.setting] = v; save(); render(); } return; }
-    if (t.matches('[data-setting-bool]')) { S.settings[t.dataset.settingBool] = t.checked; save(); render(); return; }
     if (t.matches('[data-tf]')) {
       const [id, f] = t.dataset.tf.split('|'), ty = S.settings.itemTypes.find(x => x.id === id); if (!ty) return;
       if (f === 'pts') { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) ty.pts = v; }
       else if (f === 'max') { const v = parseInt(t.value, 10); ty.max = v > 0 ? v : null; }
-      else if (f === 'firstOnly') ty.firstOnly = t.checked;
       else ty[f] = t.value;
       save(); render(); return;
     }
-    if (t.matches('[data-tier]')) {
-      const [i, f] = t.dataset.tier.split('|'), sorted = [...S.settings.tiers].sort((a, b) => a.h - b.h);
-      const v = parseFloat(t.value); if (isNaN(v) || v < 0) return;
-      sorted[+i][f] = v; S.settings.tiers = sorted; save(); render(); return;
-    }
+    if (t.matches('[data-tier]')) { const [i, f] = t.dataset.tier.split('|'), s = [...S.settings.tiers].sort((a, b) => a.h - b.h), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings.tiers = s; save(); render(); return; }
+    if (t.closest('#quickForm')) quickPreview();
   });
 
   document.addEventListener('input', e => {
-    if (e.target.matches('[data-sheet-q]')) {
-      ui.sheet.q = e.target.value; const pos = e.target.selectionStart;
-      render(); const s = $('[data-sheet-q]'); if (s) { s.focus(); s.setSelectionRange(pos, pos); }
-      return;
-    }
-    if (e.target.matches('[data-search]')) {
-      ui.q = e.target.value; const pos = e.target.selectionStart;
-      render(); const s = $('[data-search]'); if (s) { s.focus(); s.setSelectionRange(pos, pos); }
-    }
+    if (e.target.matches('[data-q]')) { ui.q = e.target.value; rerenderKeepFocus('[data-q]'); return; }
+    if (e.target.closest('#quickForm')) quickPreview();
   });
 
-  // dialogs
-  $$('dialog').forEach(dl => dl.addEventListener('click', e => { if (e.target.closest('[data-close]') || e.target === dl) dl.close(); }));
-
-  $('#cardForm').addEventListener('submit', e => {
+  document.addEventListener('submit', e => {
+    if (e.target.id !== 'quickForm') return;
     e.preventDefault();
     const F = e.target.elements, client = F.client.value.trim();
-    if (!client) { $('#cardErr').textContent = 'Qual o cliente?'; return; }
-    const luluId = F.luluId.value.trim();
-    if (luluId && S.cards.some(c => c.luluId === luluId)) { $('#cardErr').textContent = `Já existe um card com o lulu #${luluId}.`; return; }
-    const did = F.designerId.value || null;
-    S.cards.unshift({ id: uid(), luluId: luluId || null, source: luluId ? 'lulu' : 'manual', client, seller: F.seller.value.trim(), model: F.model.value.trim(), designerId: did, createdAt: new Date().toISOString(), status: did ? 'fazendo' : 'fila', round: 1, entries: [{ id: uid(), type: 'logo', status: 'pendente', at: null, round: 1 }] });
-    save(); $('#cardDlg').close(); ui.view = 'cards'; ui.cardTab = did ? 'fazendo' : 'fila'; render(); toast('Card criado');
+    if (!client) { $('#qWarn').textContent = 'Qual o cliente?'; F.client.focus(); return; }
+    const qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
+    const a = { id: uid(), designerId: me().id, date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()), client, luluId: F.luluId.value.trim(), type: F.type.value, qty, pts: suggestedPts(F.type.value, qty), status: 'pendente', note: '', extra: false, desc: '', createdAt: new Date().toISOString(), by: 'designer' };
+    S.activities.push(a); save();
+    const keepType = F.type.value, keepClient = client, keepLulu = F.luluId.value;
+    render();
+    const N = $('#quickForm').elements; N.client.value = keepClient; N.luluId.value = keepLulu; N.type.value = keepType === 'logo' ? 'var_livre' : keepType; quickPreview(); N.type.focus();
+    toast(`Lançado: ${typeOf(a.type).label}${qty > 1 ? ' ×' + qty : ''} · ${fmtPts(a.pts)} ${a.pts === 1 ? 'ponto' : 'pontos'} · aguardando aprovação`);
   });
+
+  $$('dialog').forEach(dl => dl.addEventListener('click', e => { if (e.target.closest('[data-close]') || e.target === dl) dl.close(); }));
+
+  $('#actForm').addEventListener('change', e => { if (['type', 'qty'].includes(e.target.name)) syncActPts(true); });
+  $('#actForm').addEventListener('input', e => { if (e.target.name === 'qty') syncActPts(true); });
+  $('#actForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const F = e.target.elements, admin = isAdmin();
+    const extra = F.type.value === 'extra';
+    const client = F.client.value.trim();
+    if (!client && !extra) { $('#actErr').textContent = 'Qual o cliente?'; return; }
+    if (extra && !F.desc.value.trim()) { $('#actErr').textContent = 'Descreva a atividade extra.'; return; }
+    const qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
+    const pts = admin ? Math.max(0, parseFloat(String(F.pts.value).replace(',', '.')) || 0) : suggestedPts(F.type.value, qty);
+    if ((actCtx.mode === 'erro' || actCtx.mode === 'recusada') && !F.note.value.trim()) { $('#actErr').textContent = 'Escreva um comentário para o designer.'; return; }
+    const data = { designerId: admin ? F.designerId.value : me().id, date: F.date.value, time: F.time.value, client: client || F.desc.value.trim(), luluId: F.luluId.value.trim(), type: F.type.value, qty, pts, desc: F.desc.value.trim(), extra };
+    if (admin) { data.status = F.status.value; data.note = F.note.value.trim(); }
+    if (actCtx.id) {
+      const a = act(actCtx.id);
+      if (!admin && a.status === 'erro') { data.status = 'pendente'; }
+      Object.assign(a, data);
+      if (admin) addLog(`${actCtx.mode === 'edit' ? 'editou' : STATUS[a.status].label.toLowerCase()}: ${firstName(person(a.designerId).name)} · ${a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`);
+    } else {
+      const a = { id: uid(), ...data, status: admin ? data.status : 'pendente', note: admin ? data.note : '', createdAt: new Date().toISOString(), by: admin ? 'admin' : 'designer' };
+      S.activities.push(a);
+      if (admin) addLog(`criou atividade ${extra ? 'extra' : ''} para ${firstName(person(a.designerId).name)}: ${a.client} (${fmtPts(a.pts)} pts)`);
+    }
+    save(); $('#actDlg').close(); render();
+    toast(actCtx.mode === 'erro' ? 'Erro apontado' : actCtx.mode === 'recusada' ? 'Recusada' : 'Salvo');
+  });
+  $('#delAct').onclick = () => { if (!actCtx.id || !confirm('Excluir esta atividade?')) return; S.activities = S.activities.filter(a => a.id !== actCtx.id); addLog('excluiu uma atividade'); save(); $('#actDlg').close(); render(); };
 
   $('#personForm').addEventListener('submit', e => {
     e.preventDefault();
     const F = e.target.elements, name = F.name.value.trim();
     if (!name) { $('#personErr').textContent = 'Qual o nome?'; return; }
-    const reg = F.regime.value;
-    const data = { name, regime: reg, role: reg === 'ADM' ? 'admin' : 'designer', email: F.email.value.trim(), color: F.color.value || PALETTE[0], payByPoints: reg !== 'ADM' && F.payByPoints.checked };
-    if (editingPerson) {
-      if (editingPerson.id === me().id && data.role !== 'admin' && !S.people.some(p => p.role === 'admin' && p.id !== me().id)) { $('#personErr').textContent = 'Precisa ter pelo menos um admin.'; return; }
-      Object.assign(editingPerson, data);
-    } else S.people.push({ id: uid(), ...data });
+    const data = { name, regime: F.regime.value, role: 'designer', email: F.email.value.trim(), color: F.color.value || PALETTE[0], payByPoints: F.payByPoints.checked };
+    if (editingPerson) Object.assign(editingPerson, data); else { if (!designers().length) ui.view = 'equipe'; S.people.push({ id: uid(), ...data }); addLog(`cadastrou ${name}`); }
     save(); $('#personDlg').close(); render(); toast(editingPerson ? 'Atualizado' : `${firstName(name)} entrou na equipe`);
   });
 
-  $('#shiftForm').addEventListener('submit', e => {
-    e.preventDefault(); if (!shiftCtx) return;
-    const ids = $$('#shiftPeople input[name=who]:checked').map(i => i.value);
-    const hours = e.target.elements.allNight.checked ? NIGHT() : [shiftCtx.h];
-    hours.forEach(h => setShiftIds(shiftCtx.k, h, ids));
-    save(); $('#shiftDlg').close(); render(); toast('Escala salva');
-  });
-  $('#shiftClear').onclick = () => $$('#shiftPeople input[name=who]').forEach(i => { i.checked = false; });
-
   $('#importFile').addEventListener('change', async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-    try { const s = normalize(JSON.parse(await f.text())); if (!confirm('Substituir todos os dados por este arquivo?')) return; S = s; save(); render(); toast('Importado'); }
-    catch (err) { toast('Arquivo inválido'); }
+    try { const s = normalize(JSON.parse(await f.text())); if (!confirm('Substituir todos os dados por este arquivo?')) return; S = s; save(); render(); toast('Importado'); } catch (err) { toast('Arquivo inválido'); }
   });
-
-  setInterval(() => {
-    tick();
-    // atualiza as barras do turno/painel a cada minuto se ninguém estiver digitando
-    if (!$('dialog[open]') && !document.activeElement.matches('input,select,textarea') && (ui.view === 'turno' || ui.view === 'painel')) render();
-  }, 60000);
-  setInterval(tick, 15000);
 }
 
-function tick() {
-  const now = Date.now();
-  $$('[data-since]').forEach(el => { el.textContent = fmtDur((now - new Date(el.dataset.since)) / 60000); });
+function quickPreview() {
+  const f = $('#quickForm'); if (!f) return;
+  const F = f.elements, qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
+  $('#qPts').textContent = fmtPts(suggestedPts(F.type.value, qty));
+  const w = ruleWarnings({ designerId: me().id, type: F.type.value, client: F.client.value, qty, status: 'pendente' });
+  // conta também o que está sendo lançado agora
+  const t = typeOf(F.type.value);
+  let msg = '';
+  if (t.max && F.client.value.trim()) {
+    const used = S.activities.filter(x => x.designerId === me().id && x.type === t.id && x.status !== 'recusada' && norm(x.client) === norm(F.client.value)).reduce((s, x) => s + (x.qty || 1), 0);
+    if (used + qty > t.max) msg = `Atenção: ${t.label.toLowerCase()} tem limite de ${t.max} por cliente (já lançou ${used}). A gestão pode recusar o excedente.`;
+  }
+  $('#qWarn').textContent = msg || (w ? 'Atenção: ' + w : '');
 }
 
 function io(kind) {
   if (kind === 'export') {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }));
-    a.download = `aba-${dkey(new Date())}.json`; document.body.appendChild(a); a.click(); a.remove();
+    const el = document.createElement('a');
+    el.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }));
+    el.download = `dede-${dkey(new Date())}.json`; document.body.appendChild(el); el.click(); el.remove();
     return toast('Exportado');
   }
   if (kind === 'import') return $('#importFile').click();
-  if (kind === 'demo') { if (!confirm('Recarregar os dados de exemplo? O que está aqui será substituído.')) return; seedState(); save(); render(); return toast('Exemplo recarregado'); }
-  if (kind === 'reset') {
-    if (!confirm('Zerar tudo? Fica só a conta da gestão.')) return;
-    const adm = S.people.filter(p => p.role === 'admin');
-    S = normalize({}); S.people = adm.length ? adm : [{ id: 'adm', name: 'Gestão', role: 'admin', regime: 'ADM', color: '#17140F', payByPoints: false }];
-    ui.meId = S.people[0].id; save(); render(); return toast('Tudo zerado');
-  }
+  if (kind === 'demo') { if (designers().length && !confirm('Carregar o exemplo substitui os dados atuais. Continuar?')) return; S = demoState(); save(); ui.view = 'atividades'; ui.period = 'semana'; render(); return toast('Exemplo carregado: 3 designers e 2 semanas'); }
+  if (kind === 'reset') { if (!confirm('Zerar tudo? Designers, atividades e horas serão apagados.')) return; S = normalize({ settings: S.settings }); ui.meId = 'adm'; localStorage.setItem('dede.me', 'adm'); save(); render(); return toast('Tudo zerado'); }
 }
 
-/* para a integração futura: window.aba.receberDoLulu({...}) */
-window.aba = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
+window.dede = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
 
 (function init() {
-  S = load() || seedState();
-  save();
-  bind();
-  render();
+  S = load() || normalize({});
+  save(); bind(); render();
 })();
