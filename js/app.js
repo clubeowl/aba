@@ -36,7 +36,7 @@ const ui = {
   meId: localStorage.getItem('dede.me') || 'adm',
   period: 'dia', day: new Date(),
   who: 'all', status: 'todas', q: '',
-  closed: {}, enter: true, flash: {}, limit: {}, composer: true,
+  closed: {}, enter: true, flash: {}, limit: {}, 
 };
 const me = () => person(ui.meId) || S.people.find(p => p.role === 'admin');
 const isAdmin = () => me().role === 'admin';
@@ -102,7 +102,7 @@ function render() {
   const titles = { atividades: 'Atividades', ranking: 'Ranking', metricas: 'Métricas', config: 'Configurações' };
   const sub = ui.view === 'config' ? 'só a gestão vê' : ui.view === 'ranking' ? rankLabel() : period().label;
   $('#title').innerHTML = `<h1>${titles[ui.view]}</h1><span>${esc(sub)}</span>`;
-  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : ui.view === 'ranking' ? `<div class="period-ctl"><div class="stepper"><button class="icon-btn" data-rshift="-1" aria-label="semana anterior">${ico('left')}</button><button class="today-btn" data-rshift="0">Esta semana</button><button class="icon-btn" data-rshift="1" aria-label="próxima semana">${ico('right')}</button></div></div>` : periodCtl();
+  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : ui.view === 'ranking' ? `<div class="period-ctl"><div class="stepper"><button class="icon-btn" data-rshift="-1" aria-label="semana anterior">${ico('left')}</button><button class="today-btn" data-rshift="0">Esta semana</button><button class="icon-btn" data-rshift="1" aria-label="próxima semana">${ico('right')}</button></div></div>` : periodCtl() + (ui.view === 'atividades' && designers().length ? `<button class="btn brand new-card" data-new-card data-tip="atalho: N">${ico('plus')}Lançar card</button>` : '');
   renderMe();
   const html = ({ atividades: viewAtividades, ranking: viewRanking, metricas: viewMetricas, config: viewConfig })[ui.view]();
   const main = $('#main');
@@ -160,7 +160,6 @@ function viewAtividades() {
   const cnt = st => st === 'todas' ? pool.length : pool.filter(a => a.status === st).length;
   return `<section class="page">
     ${summary(ppl, from, to)}
-    ${composer()}
     <div class="filters">
       ${seg('status', [['todas', 'Todos', cnt('todas')], ['pendente', 'Aguardando', cnt('pendente')], ['aprovada', 'Aprovados', cnt('aprovada')], ['erro', 'Corrigir', cnt('erro')], ['recusada', 'Recusados', cnt('recusada')]], ui.status)}
       <span class="sp"></span>
@@ -168,6 +167,7 @@ function viewAtividades() {
       <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, nº lulu…" value="${esc(ui.q)}" data-q></label>
     </div>
     ${ppl.map((p, i) => block(p, from, to, i)).join('')}
+    <button class="fab" data-new-card aria-label="Lançar card">${ico('plus')}</button>
   </section>`;
 }
 
@@ -212,14 +212,21 @@ const emptyCard = did => { const now = new Date(); return { designerId: did, dat
 function cardFields(c, opts = {}) {
   const admin = isAdmin(), st = S.settings;
   return `
-    <div class="cf-row r1 ${admin ? 'adm' : ''}">
+    <div class="cf-group">
+    <div class="cf-h"><b>1</b>Qual card</div>
+    <div class="cf-row r-main">
+      <label class="f"><span>Cliente</span><input name="client" value="${esc(c.client)}" placeholder="Nome do cliente" list="clientList" autocomplete="off"></label>
+      <label class="f"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Trucker evento verão" autocomplete="off"></label>
+    </div>
+    <div class="cf-row r-meta ${admin ? 'adm' : ''}">
       ${admin ? `<label class="f"><span>Designer</span><select name="designerId">${designers().map(p => `<option value="${p.id}" ${p.id === c.designerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
       <label class="f"><span>Dia</span><input type="date" name="date" value="${c.date}"></label>
       <label class="f"><span>Hora</span><input type="time" name="time" value="${c.time || ''}"></label>
-      <label class="f grow"><span>Cliente</span><input name="client" value="${esc(c.client)}" placeholder="Nome do cliente" list="clientList" autocomplete="off"></label>
-      <label class="f grow"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Trucker evento verão" autocomplete="off"></label>
-      <label class="f"><span>Nº lulu</span><input name="luluId" value="${esc(c.luluId || '')}" placeholder="opcional" inputmode="numeric"></label>
+      <label class="f"><span>Nº lulu <em>opcional</em></span><input name="luluId" value="${esc(c.luluId || '')}" placeholder="ex.: 48213" inputmode="numeric"></label>
     </div>
+    </div>
+    <div class="cf-group">
+    <div class="cf-h"><b>2</b>O que foi feito</div>
     <div class="cf-sec">
       <div class="cf-lbl">Tipo de atividade</div>
       <div class="tiles">${st.kinds.map(k => `<label class="tile" style="--tc:${k.color}" title="${esc(k.hint || '')}"><input type="radio" name="kind" value="${k.id}" ${c.kind === k.id ? 'checked' : ''}><span><i></i><b>${esc(k.label)}</b><em>${fmtPts(k.pts)} pt${k.pts === 1 ? '' : 's'}</em></span></label>`).join('')}</div>
@@ -234,6 +241,9 @@ function cardFields(c, opts = {}) {
         <div class="steps">${st.adds.map(ad => `<div class="step"><span>${esc(ad.label)}<em>+${fmtPts(ad.pts)} cada</em></span><div class="stepper-n"><button type="button" data-step="${ad.id}|-1" aria-label="menos">−</button><input name="add_${ad.id}" value="${(c.adds && c.adds[ad.id]) || 0}" inputmode="numeric"><button type="button" data-step="${ad.id}|1" aria-label="mais">+</button></div></div>`).join('')}</div>
       </div>
     </div>
+    </div>
+    <div class="cf-group">
+    <div class="cf-h"><b>3</b>Como foi</div>
     <div class="cf-two">
       <div class="cf-sec">
         <div class="cf-lbl">Dificuldade do card</div>
@@ -248,6 +258,7 @@ function cardFields(c, opts = {}) {
     <div class="cf-sec">
       <div class="cf-lbl">Detalhes da pontuação <span>opcional</span></div>
       <textarea name="details" rows="2" placeholder="ex.: não fiz modificações na logo, mas refiz os layouts do zero">${esc(c.details || '')}</textarea>
+    </div>
     </div>`;
 }
 function receipt(c, opts = {}) {
@@ -262,18 +273,27 @@ function receipt(c, opts = {}) {
     ${opts.submit || ''}
   </aside>`;
 }
-function composer() {
-  const admin = isAdmin();
-  const did = admin ? (ui.who !== 'all' ? ui.who : (designers()[0] || {}).id) : me().id;
+const clientOpts = did => [...new Set(S.activities.filter(a => a.designerId === did && a.client).slice(-120).map(a => a.client))].map(x => `<option value="${esc(x)}">`).join('');
+function newDesigner() {
+  if (!isAdmin()) return me().id;
+  if (ui.who !== 'all' && person(ui.who)) return ui.who;
+  if (ui.draft && person(ui.draft.designerId)) return ui.draft.designerId;
+  return (designers()[0] || {}).id;
+}
+function openNew() {
+  if (!designers().length) return;
+  const admin = isAdmin(), did = newDesigner();
   const c = ui.draft && ui.draft.designerId === did ? ui.draft : emptyCard(did);
-  const clients = [...new Set(S.activities.filter(a => a.designerId === did && a.client).slice(-80).map(a => a.client))];
-  return `<form class="composer ${ui.composer ? '' : 'closed'}" id="quickForm" data-cardform autocomplete="off">
-    <header class="cp-head" data-toggle-composer><span class="q-ico">${ico('plus')}</span><b>Lançar card</b><span class="q-tip">${admin ? 'lançado pela gestão já entra aprovado' : 'vai para aprovação da gestão'}</span><span class="sp"></span><span class="b-chev">${ico('chev')}</span></header>
-    <div class="cp-body"><div class="cp-inner">
-      <div class="cp-grid"><div class="cp-fields">${cardFields(c)}</div>${receipt(c, { submit: `<button class="btn dark big rc-go" type="submit">${ico('plus')}Lançar card</button>` })}</div>
-    </div></div>
-    <datalist id="clientList">${clients.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
-  </form>`;
+  actCtx = { mode: 'new' };
+  $('#actForm').innerHTML = `
+    <header><div class="dlg-title"><span class="q-ico">${ico('plus')}</span><div><h2>Lançar card</h2><p>${admin ? 'Lançado pela gestão já entra aprovado.' : 'Vai para a gestão aprovar. Os pontos aparecem calculados ao lado.'}</p></div></div><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
+    <fieldset class="cp-grid dlg"><div class="cp-fields">${cardFields(c)}</div>${receipt(c)}</fieldset>
+    <datalist id="clientList">${clientOpts(did)}</datalist>
+    <p class="err" id="actErr" role="alert"></p>
+    <footer><span class="k-hint"><kbd>Esc</kbd> fecha</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">${ico('plus')}Lançar card</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Lançar e fazer outro</button></footer>`;
+  const dl = $('#actDlg'); if (!dl.open) dl.showModal();
+  $('#actForm').scrollTop = 0;
+  $('#actForm').elements.client.focus();
 }
 function readCard(form) {
   const F = form.elements, adds = {};
@@ -297,7 +317,7 @@ function refreshReceipt(form) {
   if (el.textContent !== fmtPts(pts)) { el.textContent = fmtPts(pts); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
   rc.querySelector('.rc-val').innerHTML = `≈ ${fmtBRL(pts * S.settings.pointValue)}<small>antes do buff</small>`;
   const ov = form.elements.ptsOverride; if (ov) ov.placeholder = fmtPts(sc.total);
-  if (form.id === 'quickForm') ui.draft = c;
+  if (actCtx && actCtx.mode === 'new') ui.draft = c;
 }
 
 /* ---------- lista de cards por designer ---------- */
@@ -332,8 +352,8 @@ function block(p, from, to, idx) {
     </header>
     <div class="b-body"><div class="b-inner">
       <div class="cards">
-        <div class="ch"><span>Quando</span><span>Cliente · card</span><span>Atividade</span><span>Dificuldade · tempo</span><span class="num">Pontos</span><span class="num">Valor</span><span>Status</span><span></span></div>
-        ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nada com esse filtro.' : p.id === m.id ? 'Nenhum card ainda. Lance o primeiro aqui em cima.' : 'Nenhum card neste período.'}</span></div>`}
+        <div class="ch"><span>Quando</span><span>Cliente · card</span><span>Atividade</span><span>Dificuldade</span><span class="num">Pontos</span><span class="num">Valor</span><span>Status</span><span></span></div>
+        ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nada com esse filtro.' : p.id === m.id ? 'Nenhum card ainda. Clique em <b>Lançar card</b> para começar.' : 'Nenhum card neste período.'}</span></div>`}
         ${rows.length ? `<div class="cards-foot"><span>${plural(rows.length, 'card', 'cards')}${rate != null ? ` · ponto a ${fmtBRL(rate)}${b.mult > 1 ? ` · buff ${fmtMult(b.mult)} no fechamento` : ''}` : ''}</span><b>${fmtPts(okPts)} pts aprovados</b><b>${rate == null ? '—' : fmtBRL(okPts * rate * b.mult)}</b></div>` : ''}
       </div>
       ${rest > 0 ? `<div class="more"><button class="btn line sm" data-more="${p.id}">Mostrar mais ${Math.min(50, rest)} <span class="muted">de ${rest}</span></button></div>` : ''}
@@ -676,7 +696,7 @@ function bind() {
     if ((el = t.closest('[data-rshift]'))) { const n = +el.dataset.rshift; ui.day = n ? addDays(ui.day, 7 * n) : new Date(); ui.enter = true; render(); return; }
     if ((el = t.closest('[data-status]'))) { ui.status = el.dataset.status; render(); return; }
     if ((el = t.closest('[data-cfg]'))) { ui.cfg = el.dataset.cfg; ui.enter = true; render(); return; }
-    if (t.closest('[data-toggle-composer]')) { ui.composer = !ui.composer; t.closest('.composer').classList.toggle('closed'); return; }
+    if (t.closest('[data-new-card]')) { openNew(); return; }
     if ((el = t.closest('[data-more]'))) { ui.limit[el.dataset.more] = (ui.limit[el.dataset.more] || 25) + 50; render(); return; }
     if ((el = t.closest('[data-hours]'))) { e.stopPropagation(); openHours(el.dataset.hours); return; }
     if ((el = t.closest('[data-approve-all]'))) {
@@ -739,7 +759,7 @@ function bind() {
       save(); if (f === 'color') render(); else toast('Atualizado'); return;
     }
     if (t.matches('[data-tier]')) { const [i, f] = t.dataset.tier.split('|'), s = [...S.settings.buff].sort((a, b) => a.h - b.h), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings.buff = s; save(); render(); toast('Buff atualizado'); return; }
-    if (t.closest('[data-cardform]')) { if (t.name === 'designerId' && t.form.id === 'quickForm') { ui.draft = { ...readCard(t.form), designerId: t.value }; render(); return; } refreshReceipt(t.closest('form')); }
+    if (t.closest('[data-cardform]')) { if (t.name === 'designerId' && actCtx && actCtx.mode === 'new') { const dlst = $('#clientList'); if (dlst) dlst.innerHTML = clientOpts(t.value); } refreshReceipt(t.closest('form')); }
   });
 
   document.addEventListener('input', e => {
@@ -747,18 +767,10 @@ function bind() {
     if (e.target.closest('[data-cardform]')) refreshReceipt(e.target.closest('form'));
   });
 
-  document.addEventListener('submit', e => {
-    if (e.target.id !== 'quickForm') return;
-    e.preventDefault();
-    const a = saveCardFromForm(e.target, null); if (!a) return;
-    ui.flash[a.id] = 'new';
-    if (isAdmin()) addLog(`lançou para ${who(a)}: ${a.client} (${fmtPts(a.pts)} pts)`);
-    save();
-    // mantém dia, hora e designer; limpa o resto
-    ui.draft = { ...emptyCard(a.designerId), date: a.date };
-    render();
-    const N = $('#quickForm').elements; N.client.focus();
-    toast(`Card lançado · ${fmtPts(a.pts)} ${a.pts === 1 ? 'ponto' : 'pontos'}${isAdmin() ? '' : ' · aguardando aprovação'}`);
+  document.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (ui.view !== 'atividades' || $('dialog[open]') || e.target.closest('input, textarea, select, [contenteditable]')) return;
+    e.preventDefault(); openNew();
   });
 
   $$('dialog').forEach(dl => {
@@ -768,6 +780,17 @@ function bind() {
 
   $('#actForm').addEventListener('submit', e => {
     e.preventDefault();
+    if (actCtx.mode === 'new') {
+      const n = saveCardFromForm(e.target, null); if (!n) return;
+      ui.flash[n.id] = 'new';
+      if (isAdmin()) addLog(`lançou para ${who(n)}: ${n.client} (${fmtPts(n.pts)} pts)`);
+      save();
+      ui.draft = { ...emptyCard(n.designerId), date: n.date };
+      const again = e.submitter && e.submitter.name === 'again';
+      if (again) { render(); openNew(); } else { closeDlg($('#actDlg')); render(); }
+      toast(`Card lançado · ${fmtPts(n.pts)} ${n.pts === 1 ? 'ponto' : 'pontos'}${isAdmin() ? '' : ' · aguardando aprovação'}`);
+      return;
+    }
     const a = act(actCtx.id), admin = isAdmin();
     if (admin && (e.target.elements.status.value === 'erro' || e.target.elements.status.value === 'recusada') && !e.target.elements.note.value.trim()) { $('#actErr').textContent = 'Escreva um comentário para o designer.'; return; }
     if (!saveCardFromForm(e.target, a)) return;
