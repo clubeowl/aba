@@ -36,7 +36,7 @@ const ui = {
   meId: localStorage.getItem('dede.me') || 'adm',
   period: 'dia', day: new Date(),
   who: 'all', status: 'todas', q: '',
-  closed: {}, enter: true, flash: {}, limit: {},
+  closed: {}, enter: true, flash: {}, limit: {}, composer: true,
 };
 const me = () => person(ui.meId) || S.people.find(p => p.role === 'admin');
 const isAdmin = () => me().role === 'admin';
@@ -45,6 +45,11 @@ const avatar = (p, size = '') => p ? `<span class="av ${size}" style="--pc:${p.c
 const I = {
   atividades: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
   metricas: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>',
+  ranking: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>',
+  note: '<path d="M4 4h16v12H8l-4 4z"/>',
+  fire: '<path d="M12 2s4 4.5 4 8.5A4 4 0 0 1 8 10.5C8 8 10 6 10 6s-4 2.5-4 8a6 6 0 0 0 12 0c0-6-6-12-6-12z"/>',
   config: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
@@ -87,19 +92,19 @@ const periodCtl = () => `<div class="period-ctl">
 </div>`;
 
 /* ---------- shell ---------- */
-const MENU = [['atividades', 'Atividades'], ['metricas', 'Métricas'], ['config', 'Configurações']];
+const MENU = [['atividades', 'Atividades'], ['ranking', 'Ranking'], ['metricas', 'Métricas'], ['config', 'Configurações']];
 function render() {
   if (!person(ui.meId)) ui.meId = me().id;
   const items = MENU.filter(([v]) => v !== 'config' || isAdmin());
   if (!items.some(i => i[0] === ui.view)) ui.view = 'atividades';
   const pend = S.activities.filter(a => a.status === 'pendente' && (isAdmin() || a.designerId === me().id)).length;
   $('#nav').innerHTML = items.map(([v, l]) => `<button data-view="${v}" class="${ui.view === v ? 'on' : ''}" aria-label="${l}">${ico(v)}<span class="lbl">${l}</span>${v === 'atividades' && pend ? `<i class="nav-badge">${pend > 99 ? '99+' : pend}</i>` : ''}</button>`).join('') + '<i class="rail-ind"></i>';
-  const titles = { atividades: 'Atividades', metricas: 'Métricas', config: 'Configurações' };
-  const sub = ui.view === 'config' ? 'só a gestão vê' : period().label;
+  const titles = { atividades: 'Atividades', ranking: 'Ranking', metricas: 'Métricas', config: 'Configurações' };
+  const sub = ui.view === 'config' ? 'só a gestão vê' : ui.view === 'ranking' ? rankLabel() : period().label;
   $('#title').innerHTML = `<h1>${titles[ui.view]}</h1><span>${esc(sub)}</span>`;
-  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : periodCtl();
+  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : ui.view === 'ranking' ? `<div class="period-ctl"><div class="stepper"><button class="icon-btn" data-rshift="-1" aria-label="semana anterior">${ico('left')}</button><button class="today-btn" data-rshift="0">Esta semana</button><button class="icon-btn" data-rshift="1" aria-label="próxima semana">${ico('right')}</button></div></div>` : periodCtl();
   renderMe();
-  const html = ({ atividades: viewAtividades, metricas: viewMetricas, config: viewConfig })[ui.view]();
+  const html = ({ atividades: viewAtividades, ranking: viewRanking, metricas: viewMetricas, config: viewConfig })[ui.view]();
   const main = $('#main');
   main.innerHTML = html;
   main.classList.toggle('enter', ui.enter);
@@ -145,6 +150,7 @@ function go(view) { ui.view = view; ui.enter = true; render(); scrollTo({ top: 0
    ATIVIDADES (igual para todos)
    ============================================================ */
 const visiblePeople = () => isAdmin() ? (ui.who === 'all' ? designers() : [person(ui.who)].filter(Boolean)) : [me()];
+const MONTHL = d => `${MESL[d.getMonth()]}`;
 
 function viewAtividades() {
   if (!designers().length) return welcome();
@@ -154,134 +160,278 @@ function viewAtividades() {
   const cnt = st => st === 'todas' ? pool.length : pool.filter(a => a.status === st).length;
   return `<section class="page">
     ${summary(ppl, from, to)}
-    ${quickAdd()}
+    ${composer()}
     <div class="filters">
-      ${seg('status', [['todas', 'Todas', cnt('todas')], ['pendente', 'Aguardando', cnt('pendente')], ['aprovada', 'Aprovadas', cnt('aprovada')], ['erro', 'Corrigir', cnt('erro')], ['recusada', 'Recusadas', cnt('recusada')]], ui.status)}
+      ${seg('status', [['todas', 'Todos', cnt('todas')], ['pendente', 'Aguardando', cnt('pendente')], ['aprovada', 'Aprovados', cnt('aprovada')], ['erro', 'Corrigir', cnt('erro')], ['recusada', 'Recusados', cnt('recusada')]], ui.status)}
       <span class="sp"></span>
       ${isAdmin() ? `<label class="select-pill">${ico('users')}<select data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${ico('chev')}</label>` : ''}
-      <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, nº lulu…" value="${esc(ui.q)}" data-q></label>
+      <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, nº lulu…" value="${esc(ui.q)}" data-q></label>
     </div>
     ${ppl.map((p, i) => block(p, from, to, i)).join('')}
   </section>`;
 }
 
 function welcome() {
-  const admin = isAdmin();
   return `<section class="page"><div class="welcome">
     <img src="img/seubone-logo-branco.png" alt="SeuBoné" class="w-logo">
     <h2>Bem-vindo ao <b>Dedé</b></h2>
-    <p>Os designers lançam o que fizeram, a gestão confere e todo mundo acompanha pontos, horas online e quanto vai receber.</p>
+    <p>Os designers lançam cada card que fizeram, a gestão confere e todo mundo acompanha pontos, buff, ranking e quanto vai receber.</p>
     <div class="w-steps"><div><b>1</b>Cadastre os designers</div><div><b>2</b>Confira a tabela de pontos</div><div><b>3</b>O time começa a lançar</div></div>
-    ${admin ? `<div class="btns"><button class="btn brand big" data-add-person>${ico('plus')}Cadastrar primeiro designer</button><button class="btn glass" data-io="demo">Ver com dados de exemplo</button></div>` : ''}
+    ${isAdmin() ? `<div class="btns"><button class="btn brand big" data-add-person>${ico('plus')}Cadastrar primeiro designer</button><button class="btn glass" data-io="demo">Ver com dados de exemplo</button></div>` : ''}
   </div></section>`;
 }
 
 function summary(ppl, from, to) {
   const admin = isAdmin();
-  const st = ppl.map(p => stats(p.id, from, to));
-  const t = st.reduce((a, s) => ({ pts: a.pts + s.points, pend: a.pend + s.pending, pendPts: a.pendPts + s.pendingPts, min: a.min + s.minutes, pay: a.pay + (s.pay || 0), cl: a.cl + s.clients }), { pts: 0, pend: 0, pendPts: 0, min: 0, pay: 0, cl: 0 });
+  const st = ppl.map(p => ({ p, s: stats(p.id, from, to) }));
+  const t = st.reduce((a, { s }) => ({ pts: a.pts + s.points, pend: a.pend + s.pending, pendPts: a.pendPts + s.pendingPts, min: a.min + s.minutes, pay: a.pay + (s.pay || 0), cards: a.cards + s.cards }), { pts: 0, pend: 0, pendPts: 0, min: 0, pay: 0, cards: 0 });
   const one = ppl.length === 1 ? st[0] : null;
-  const who = admin ? (ppl.length === 1 ? firstName(ppl[0].name) : 'Time') : 'Você';
+  const who = admin ? (one ? firstName(one.p.name) : 'Time') : 'Você';
+  let buffCell;
+  if (one) {
+    const b = one.s.buff;
+    buffCell = b.eligible
+      ? `<div class="sm-buff m${String(b.mult).replace('.', '')}"><span>${ico('bolt')} Buff de ${MONTHL(parseKey(to))}</span><b>${fmtMult(b.mult)}</b><small>${fmtNum(b.avgH)}h/dia${b.next ? ` · faltam ${fmtNum(b.next.h - b.avgH)}h p/ ${fmtMult(b.next.mult)}` : ' · máximo'}</small></div>`
+      : `<div class="sm-buff"><span>${ico('bolt')} Buff</span><b>—</b><small>só para PJ</small></div>`;
+  } else {
+    const pj = st.filter(x => x.s.buff.eligible), on = pj.filter(x => x.s.buff.mult > 1).length;
+    buffCell = `<div class="sm-buff"><span>${ico('bolt')} Buff ativo</span><b>${on}<i>/${pj.length}</i></b><small>PJs com buff no mês</small></div>`;
+  }
   return `<div class="summary">
-    <div class="sm-main"><span>${who} · pontos aprovados</span><b>${num(t.pts)}</b><small>${plural(t.cl, 'cliente atendido', 'clientes atendidos')}</small></div>
-    <div><span>Aguardando aprovação</span><b>${num(t.pendPts)}</b><small>${plural(t.pend, 'atividade', 'atividades')}</small></div>
-    <div><span>Tempo online</span><b>${num(t.min, 'dur')}</b><small>${one ? `${fmtNum(one.avgH)}h por dia` : 'soma do time'}</small></div>
-    <div><span>Bônus</span><b>${one ? fmtMult(one.mult) : '—'}</b><small>${one ? 'pela média de horas' : 'varia por pessoa'}</small></div>
-    <div class="sm-pay"><span>${admin && ppl.length > 1 ? 'A pagar' : 'A receber'}</span><b>${num(t.pay, 'brl')}</b><small>só o que foi aprovado</small></div>
+    <div class="sm-main"><span>${who} · pontos aprovados</span><b>${num(t.pts)}</b><small>${plural(t.cards, 'card aprovado', 'cards aprovados')}</small></div>
+    <div><span>Aguardando aprovação</span><b>${num(t.pendPts)}</b><small>${plural(t.pend, 'card', 'cards')}</small></div>
+    <div><span>Tempo online</span><b>${num(t.min, 'dur')}</b><small>${one ? 'no período' : 'soma do time'}</small></div>
+    ${buffCell}
+    <div class="sm-pay"><span>${admin && !one ? 'A pagar' : 'A receber'}</span><b>${num(t.pay, 'brl')}</b><small>aprovados × ${fmtBRL(S.settings.pointValue)}${one && one.s.buff.mult > 1 ? ' × buff' : ''}</small></div>
   </div>`;
 }
 
-/* lançamento rápido: igual para todos; admin escolhe o designer e pode lançar extra */
-function quickAdd() {
-  const admin = isAdmin(), now = new Date(), k = dkey(ui.period === 'dia' ? ui.day : now);
-  const who = admin ? (ui.who !== 'all' ? ui.who : (designers()[0] || {}).id) : me().id;
-  const clients = [...new Set(S.activities.filter(a => a.designerId === who && a.client).slice(-80).map(a => a.client))];
-  return `<form class="quick" id="quickForm" autocomplete="off">
-    <div class="q-head"><span class="q-ico">${ico('plus')}</span><b>Lançar atividade</b><span class="q-tip">preencha e aperte <kbd>Enter</kbd></span></div>
-    <div class="q-row ${admin ? 'adm' : ''}">
-      ${admin ? `<label class="f q-who"><span>Designer</span><select name="designerId">${designers().map(p => `<option value="${p.id}" ${p.id === who ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
-      <label class="f q-date"><span>Data</span><input type="date" name="date" value="${k}"></label>
-      <label class="f q-time"><span>Hora</span><input type="time" name="time" value="${hm(now)}"></label>
-      <label class="f q-client"><span>Cliente</span><input name="client" placeholder="Nome do cliente" list="clientList"></label>
-      <label class="f q-lulu"><span>Nº lulu</span><input name="luluId" placeholder="opcional" inputmode="numeric"></label>
-      <label class="f q-type"><span>Atividade</span><select name="type">${S.settings.itemTypes.map(x => `<option value="${x.id}">${esc(x.label)} · ${fmtPts(x.pts)} pt</option>`).join('')}${admin ? '<option value="extra">Extra · pontos livres</option>' : ''}</select></label>
-      <label class="f q-qty"><span>Qtd</span><input type="number" name="qty" min="1" max="50" value="1"></label>
-      <label class="f q-pts"><span>Pontos</span><input name="pts" value="${fmtPts(S.settings.itemTypes[0]?.pts || 0)}" ${admin ? '' : 'readonly tabindex="-1"'} inputmode="decimal"></label>
-      <button class="btn dark q-go" type="submit">${ico('plus')}<span>Adicionar</span></button>
+/* ---------- formulário do card (usado no lançamento e na edição) ---------- */
+const emptyCard = did => { const now = new Date(); return { designerId: did, date: dkey(ui.period === 'dia' ? ui.day : now), time: hm(now), client: '', name: '', luluId: '', kind: 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: '' }; };
+
+function cardFields(c, opts = {}) {
+  const admin = isAdmin(), st = S.settings;
+  return `
+    <div class="cf-row r1 ${admin ? 'adm' : ''}">
+      ${admin ? `<label class="f"><span>Designer</span><select name="designerId">${designers().map(p => `<option value="${p.id}" ${p.id === c.designerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
+      <label class="f"><span>Dia</span><input type="date" name="date" value="${c.date}"></label>
+      <label class="f"><span>Hora</span><input type="time" name="time" value="${c.time || ''}"></label>
+      <label class="f grow"><span>Cliente</span><input name="client" value="${esc(c.client)}" placeholder="Nome do cliente" list="clientList" autocomplete="off"></label>
+      <label class="f grow"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Trucker evento verão" autocomplete="off"></label>
+      <label class="f"><span>Nº lulu</span><input name="luluId" value="${esc(c.luluId || '')}" placeholder="opcional" inputmode="numeric"></label>
     </div>
-    <datalist id="clientList">${clients.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-    <p class="q-warn" id="qWarn"></p>
+    <div class="cf-sec">
+      <div class="cf-lbl">Tipo de atividade</div>
+      <div class="tiles">${st.kinds.map(k => `<label class="tile" style="--tc:${k.color}" title="${esc(k.hint || '')}"><input type="radio" name="kind" value="${k.id}" ${c.kind === k.id ? 'checked' : ''}><span><i></i><b>${esc(k.label)}</b><em>${fmtPts(k.pts)} pt${k.pts === 1 ? '' : 's'}</em></span></label>`).join('')}</div>
+    </div>
+    <div class="cf-two">
+      <div class="cf-sec">
+        <div class="cf-lbl">Logo recebida</div>
+        <div class="pills">${st.logoQ.map(q => `<label class="pill"><input type="radio" name="logoQ" value="${q.id}" ${c.logoQ === q.id ? 'checked' : ''}><span>${esc(q.label)}${q.pts ? `<em>+${fmtPts(q.pts)}</em>` : ''}</span></label>`).join('')}</div>
+      </div>
+      <div class="cf-sec">
+        <div class="cf-lbl">Adicionais</div>
+        <div class="steps">${st.adds.map(ad => `<div class="step"><span>${esc(ad.label)}<em>+${fmtPts(ad.pts)} cada</em></span><div class="stepper-n"><button type="button" data-step="${ad.id}|-1" aria-label="menos">−</button><input name="add_${ad.id}" value="${(c.adds && c.adds[ad.id]) || 0}" inputmode="numeric"><button type="button" data-step="${ad.id}|1" aria-label="mais">+</button></div></div>`).join('')}</div>
+      </div>
+    </div>
+    <div class="cf-two">
+      <div class="cf-sec">
+        <div class="cf-lbl">Dificuldade do card</div>
+        <div class="pills diffs">${st.diffs.map(d => `<label class="pill diff" style="--dc:${d.color}"><input type="radio" name="diff" value="${d.id}" ${c.diff === d.id ? 'checked' : ''}><span><i></i>${esc(d.label)}</span></label>`).join('')}</div>
+      </div>
+      <div class="cf-sec">
+        <div class="cf-lbl">Tempo neste card</div>
+        <div class="time-row"><label class="f t-in">${ico('timer')}<input name="mins" value="${toHM(c.mins)}" placeholder="0:45" inputmode="decimal"></label>
+          ${[15, 30, 45, 60, 90, 120].map(m => `<button type="button" class="qt" data-qt="${m}">${m < 60 ? m + 'min' : fmtDur(m).replace('h00', 'h')}</button>`).join('')}</div>
+      </div>
+    </div>
+    <div class="cf-sec">
+      <div class="cf-lbl">Detalhes da pontuação <span>opcional</span></div>
+      <textarea name="details" rows="2" placeholder="ex.: não fiz modificações na logo, mas refiz os layouts do zero">${esc(c.details || '')}</textarea>
+    </div>`;
+}
+function receipt(c, opts = {}) {
+  const sc = scoreOf(c), admin = isAdmin();
+  const pts = opts.override != null ? opts.override : sc.total;
+  return `<aside class="receipt">
+    <div class="rc-head">${ico('star')}<b>Pontuação</b></div>
+    <ul class="rc-lines">${sc.lines.map(l => `<li><span>${esc(l.label)}</span><b>${l.pts > 0 && sc.lines[0] !== l ? '+' : ''}${fmtPts(l.pts)}</b></li>`).join('')}</ul>
+    <div class="rc-total"><span>Total</span><b class="rc-pts">${fmtPts(pts)}</b><small>pts</small></div>
+    ${admin ? `<label class="rc-ovr"><span>Ajustar pontos</span><input name="ptsOverride" value="${opts.override != null ? opts.override : ''}" placeholder="${fmtPts(sc.total)}" inputmode="decimal"></label>` : ''}
+    <div class="rc-val">≈ ${fmtBRL(pts * S.settings.pointValue)}<small>antes do buff</small></div>
+    ${opts.submit || ''}
+  </aside>`;
+}
+function composer() {
+  const admin = isAdmin();
+  const did = admin ? (ui.who !== 'all' ? ui.who : (designers()[0] || {}).id) : me().id;
+  const c = ui.draft && ui.draft.designerId === did ? ui.draft : emptyCard(did);
+  const clients = [...new Set(S.activities.filter(a => a.designerId === did && a.client).slice(-80).map(a => a.client))];
+  return `<form class="composer ${ui.composer ? '' : 'closed'}" id="quickForm" data-cardform autocomplete="off">
+    <header class="cp-head" data-toggle-composer><span class="q-ico">${ico('plus')}</span><b>Lançar card</b><span class="q-tip">${admin ? 'lançado pela gestão já entra aprovado' : 'vai para aprovação da gestão'}</span><span class="sp"></span><span class="b-chev">${ico('chev')}</span></header>
+    <div class="cp-body"><div class="cp-inner">
+      <div class="cp-grid"><div class="cp-fields">${cardFields(c)}</div>${receipt(c, { submit: `<button class="btn dark big rc-go" type="submit">${ico('plus')}Lançar card</button>` })}</div>
+    </div></div>
+    <datalist id="clientList">${clients.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
   </form>`;
 }
+function readCard(form) {
+  const F = form.elements, adds = {};
+  S.settings.adds.forEach(ad => { adds[ad.id] = Math.max(0, parseInt(F['add_' + ad.id]?.value, 10) || 0); });
+  const c = {
+    designerId: F.designerId ? F.designerId.value : me().id,
+    date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()),
+    client: F.client.value.trim(), name: F.name.value.trim(), luluId: F.luluId.value.trim(),
+    kind: (F.kind && F.kind.value) || 'logo', logoQ: (F.logoQ && F.logoQ.value) || 'alta', adds,
+    diff: (F.diff && F.diff.value) || 'moderado', mins: parseHM(F.mins.value), details: F.details.value.trim(),
+  };
+  const ov = F.ptsOverride ? String(F.ptsOverride.value).trim().replace(',', '.') : '';
+  c.ptsOverride = ov !== '' && !isNaN(parseFloat(ov)) ? Math.max(0, parseFloat(ov)) : null;
+  return c;
+}
+function refreshReceipt(form) {
+  const c = readCard(form), sc = scoreOf(c), rc = form.querySelector('.receipt'); if (!rc) return;
+  const pts = c.ptsOverride != null ? c.ptsOverride : sc.total;
+  rc.querySelector('.rc-lines').innerHTML = sc.lines.map((l, i) => `<li><span>${esc(l.label)}</span><b>${i ? '+' : ''}${fmtPts(l.pts)}</b></li>`).join('');
+  const el = rc.querySelector('.rc-pts');
+  if (el.textContent !== fmtPts(pts)) { el.textContent = fmtPts(pts); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  rc.querySelector('.rc-val').innerHTML = `≈ ${fmtBRL(pts * S.settings.pointValue)}<small>antes do buff</small>`;
+  const ov = form.elements.ptsOverride; if (ov) ov.placeholder = fmtPts(sc.total);
+  if (form.id === 'quickForm') ui.draft = c;
+}
 
+/* ---------- lista de cards por designer ---------- */
 function block(p, from, to, idx) {
   const admin = isAdmin(), m = me();
   const s = stats(p.id, from, to);
-  const rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
+  const rate = p.payByPoints ? S.settings.pointValue : null;
   let rows = s.acts.slice();
   if (ui.status !== 'todas') rows = rows.filter(a => a.status === ui.status);
-  if (ui.q) { const q = ui.q.toLowerCase(); rows = rows.filter(a => `${a.client} ${a.luluId} ${typeOf(a.type).label} ${a.desc}`.toLowerCase().includes(q)); }
+  if (ui.q) { const q = ui.q.toLowerCase(); rows = rows.filter(a => `${a.client} ${a.name} ${a.luluId} ${kindOf(a.kind).label} ${a.details}`.toLowerCase().includes(q)); }
   rows.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-  const closed = ui.closed[p.id];
   const pendN = s.acts.filter(a => a.status === 'pendente').length;
-  let lastDay = '';
   const lim = ui.limit[p.id] || 25, rest = rows.length - lim;
-  const body = rows.slice(0, lim).map((a, i) => {
-    const t = typeOf(a.type), st = STATUS[a.status];
-    const warn = a.status !== 'recusada' && !a.extra ? ruleWarnings(a) : '';
-    const sug = a.extra ? null : suggestedPts(a.type, a.qty);
-    const adjusted = sug != null && Math.abs(sug - a.pts) > 0.001;
-    const newDay = a.date !== lastDay; lastDay = a.date;
-    const mine = a.designerId === m.id;
-    const canEdit = mine && (a.status === 'pendente' || a.status === 'erro');
-    let actions = '';
-    if (admin) {
-      actions = `<span class="ab-more">
-        ${a.status !== 'erro' ? `<button class="ab warn" data-mark="${a.id}|erro" data-tip="Pedir correção">${ico('alert')}</button>` : ''}
-        ${a.status !== 'recusada' ? `<button class="ab no" data-mark="${a.id}|recusada" data-tip="Recusar">${ico('x')}</button>` : ''}
-        <button class="ab" data-edit-act="${a.id}" data-tip="Editar">${ico('edit')}</button></span>${a.status !== 'aprovada' ? `<button class="ab ok" data-approve="${a.id}" data-tip="Aprovar">${ico('check')}</button>` : '<span class="ab-gap"></span>'}`;
-    } else if (canEdit) {
-      actions = `<span class="ab-more show"><button class="ab" data-edit-act="${a.id}" data-tip="${a.status === 'erro' ? 'Corrigir' : 'Editar'}">${ico('edit')}</button><button class="ab no" data-del-act="${a.id}" data-tip="Excluir">${ico('trash')}</button></span>`;
-    }
-    const flash = ui.flash[a.id] ? `flash-${ui.flash[a.id]}` : '';
-    return `<tr class="${newDay ? 'newday' : ''} r-${a.status} ${flash}" style="--i:${Math.min(i, 14)}">
-      <td class="c-date"><b>${fmtDay(a.date)}</b><small>${esc(a.time || '')}</small></td>
-      <td class="c-client"><b>${esc(a.client || '—')}</b><small>${a.luluId ? `lulu #${esc(a.luluId)}` : a.extra ? 'lançada pela gestão' : 'sem nº lulu'}${a.desc && a.desc !== a.client ? ' · ' + esc(a.desc) : ''}</small></td>
-      <td class="c-act"><span class="tag" style="--tc:${t.color}"><i></i>${a.extra ? 'Extra' : esc(t.label)}${a.qty > 1 ? `<em>×${a.qty}</em>` : ''}</span>${warn ? `<span class="rule-warn" data-tip="${esc(warn)}">${ico('alert')}</span>` : ''}</td>
-      <td class="num c-pts">${admin ? `<input class="pts-in ${adjusted ? 'adj' : ''}" type="number" step="0.25" min="0" value="${a.pts}" data-pts="${a.id}" title="${adjusted ? `pela tabela: ${fmtPts(sug)}` : 'clique para ajustar'}">` : `<b>${fmtPts(a.pts)}</b>${adjusted ? `<small class="adj-note">tabela: ${fmtPts(sug)}</small>` : ''}`}</td>
-      <td class="num money ${a.status === 'aprovada' ? '' : 'faded'}">${rate == null ? '—' : fmtBRL(a.pts * rate)}</td>
-      <td class="c-status"><span class="st ${st.cls}">${st.label}</span>${a.note ? `<small class="st-note">${esc(a.note)}</small>` : ''}</td>
-      <td class="c-actions">${actions}</td>
-    </tr>`;
-  }).join('');
-  const okPts = rows.filter(a => a.status === 'aprovada').reduce((x, a) => x + a.pts, 0);
   const one = visiblePeople().length === 1;
-  return `<section class="block ${closed ? 'closed' : ''}" style="--pc:${p.color};--i:${idx}">
+  const body = rows.slice(0, lim).map((a, i) => cardRow(a, i, rate, admin, m)).join('');
+  const okPts = rows.filter(a => a.status === 'aprovada').reduce((x, a) => x + a.pts, 0);
+  const b = s.buff;
+  return `<section class="block ${ui.closed[p.id] ? 'closed' : ''}" style="--pc:${p.color};--i:${idx}">
     <header class="b-head" data-toggle="${p.id}">
       ${avatar(p, 'md')}
       <div class="b-name"><b>${esc(p.name)}</b><span>${p.regime}${p.email ? ' · ' + esc(p.email) : ''}</span></div>
       <div class="b-chips">
-        <span class="chip"><small>Clientes</small><b>${s.clients}</b></span>
+        <span class="chip"><small>Cards</small><b>${s.cards}</b></span>
         <span class="chip"><small>Aprovados</small><b>${fmtPts(s.points)}</b></span>
         ${pendN ? `<span class="chip warn"><small>Aguardando</small><b>${pendN}</b></span>` : ''}
         <${admin ? 'button' : 'span'} class="chip ${admin ? 'edit' : ''}" ${admin ? `data-hours="${p.id}" data-tip="Lançar horas online"` : ''}><small>Online</small><b>${fmtDur(s.minutes)}</b>${admin ? ico('clock', 'mini') : ''}</${admin ? 'button' : 'span'}>
-        <span class="chip"><small>Bônus</small><b>${fmtMult(s.mult)}</b></span>
+        <span class="chip buff m${String(b.mult).replace('.', '')}" ${b.eligible ? `data-tip="${fmtNum(b.avgH)}h/dia em ${MONTHL(parseKey(to))}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>
         <span class="chip dark"><small>A receber</small><b>${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</b></span>
       </div>
       ${admin && pendN ? `<button class="btn ok sm" data-approve-all="${p.id}">${ico('check')}Aprovar ${pendN}</button>` : ''}
       ${one ? '' : `<span class="b-chev">${ico('chev')}</span>`}
     </header>
     <div class="b-body"><div class="b-inner">
-      <div class="table-wrap"><table class="grid">
-        <thead><tr><th>Data</th><th>Cliente</th><th>Atividade</th><th class="num">Pontos</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead>
-        <tbody>${body || `<tr class="empty"><td colspan="7"><div>${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nada com esse filtro.' : mineEmpty(p)}</span></div></td></tr>`}</tbody>
-        ${rows.length ? `<tfoot><tr><td colspan="3">${plural(rows.length, 'atividade', 'atividades')}${rate != null ? ` · ponto a ${fmtBRL(rate)}` : ''}</td><td class="num">${fmtPts(okPts)}</td><td class="num money">${rate == null ? '—' : fmtBRL(okPts * rate)}</td><td colspan="2"></td></tr></tfoot>` : ''}
-      </table></div>
+      <div class="cards">
+        <div class="ch"><span>Quando</span><span>Cliente · card</span><span>Atividade</span><span>Dificuldade · tempo</span><span class="num">Pontos</span><span class="num">Valor</span><span>Status</span><span></span></div>
+        ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nada com esse filtro.' : p.id === m.id ? 'Nenhum card ainda. Lance o primeiro aqui em cima.' : 'Nenhum card neste período.'}</span></div>`}
+        ${rows.length ? `<div class="cards-foot"><span>${plural(rows.length, 'card', 'cards')}${rate != null ? ` · ponto a ${fmtBRL(rate)}${b.mult > 1 ? ` · buff ${fmtMult(b.mult)} no fechamento` : ''}` : ''}</span><b>${fmtPts(okPts)} pts aprovados</b><b>${rate == null ? '—' : fmtBRL(okPts * rate * b.mult)}</b></div>` : ''}
+      </div>
       ${rest > 0 ? `<div class="more"><button class="btn line sm" data-more="${p.id}">Mostrar mais ${Math.min(50, rest)} <span class="muted">de ${rest}</span></button></div>` : ''}
     </div></div>
   </section>`;
 }
-const mineEmpty = p => p.id === me().id ? 'Nada lançado ainda. Use a linha acima para começar.' : 'Nenhuma atividade neste período.';
+function cardRow(a, i, rate, admin, m) {
+  const k = kindOf(a.kind), d = diffOf(a.diff), st = STATUS[a.status], lq = logoOf(a.logoQ);
+  const sc = scoreOf(a), adjusted = Math.abs(sc.total - a.pts) > 0.001;
+  const mods = [];
+  if (a.logoQ && a.kind === 'logo' || lq.pts) mods.push(`<span class="mod ${lq.pts ? 'plus' : ''}">logo ${esc(lq.label.toLowerCase().replace(' qualidade', ''))}${lq.pts ? ` +${fmtPts(lq.pts)}` : ''}</span>`);
+  S.settings.adds.forEach(ad => { const n = (a.adds || {})[ad.id]; if (n) mods.push(`<span class="mod plus">${n} ${esc(ad.label.toLowerCase().replace('variações da logo', 'variaç' + (n > 1 ? 'ões' : 'ão')).replace('mudanças', n > 1 ? 'mudanças' : 'mudança'))}</span>`); });
+  const mine = a.designerId === m.id, canEdit = mine && (a.status === 'pendente' || a.status === 'erro');
+  let actions = '';
+  if (admin) {
+    actions = `<span class="ab-more">
+      ${a.status !== 'erro' ? `<button class="ab warn" data-mark="${a.id}|erro" data-tip="Pedir correção">${ico('alert')}</button>` : ''}
+      ${a.status !== 'recusada' ? `<button class="ab no" data-mark="${a.id}|recusada" data-tip="Recusar">${ico('x')}</button>` : ''}
+      <button class="ab" data-edit-act="${a.id}" data-tip="Editar">${ico('edit')}</button></span>${a.status !== 'aprovada' ? `<button class="ab ok" data-approve="${a.id}" data-tip="Aprovar">${ico('check')}</button>` : '<span class="ab-gap"></span>'}`;
+  } else if (canEdit) {
+    actions = `<span class="ab-more show"><button class="ab" data-edit-act="${a.id}" data-tip="${a.status === 'erro' ? 'Corrigir' : 'Editar'}">${ico('edit')}</button><button class="ab no" data-del-act="${a.id}" data-tip="Excluir">${ico('trash')}</button></span>`;
+  } else actions = `<span class="ab-more show"><button class="ab" data-view-act="${a.id}" data-tip="Ver detalhes">${ico('note')}</button></span>`;
+  const flash = ui.flash[a.id] ? `flash-${ui.flash[a.id]}` : '';
+  return `<div class="crow r-${a.status} ${flash}" style="--dc:${d.color};--i:${Math.min(i, 14)}">
+    <div class="c-when"><b>${fmtDay(a.date)}</b><small>${esc(a.time || '')}</small></div>
+    <div class="c-main"><b>${esc(a.client || '—')}</b><span>${a.name ? esc(a.name) : '<i>sem nome</i>'}${a.luluId ? ` · lulu #${esc(a.luluId)}` : ''}</span>${a.details ? `<em title="${esc(a.details)}">“${esc(a.details)}”</em>` : ''}</div>
+    <div class="c-kind"><span class="tag" style="--tc:${k.color}"><i></i>${esc(k.label)}</span>${mods.length ? `<div class="mods">${mods.join('')}</div>` : ''}</div>
+    <div class="c-meta"><span class="dff" style="--dc:${d.color}"><i></i>${esc(d.label)}</span>${a.mins ? `<small>${ico('timer')}${fmtDur(a.mins)}</small>` : ''}</div>
+    <div class="num c-pts">${admin ? `<input class="pts-in ${adjusted ? 'adj' : ''}" type="number" step="0.25" min="0" value="${a.pts}" data-pts="${a.id}" title="${adjusted ? `pelas regras: ${fmtPts(sc.total)}` : 'clique para ajustar'}">` : `<b>${fmtPts(a.pts)}</b>${adjusted ? `<small class="adj-note">regras: ${fmtPts(sc.total)}</small>` : ''}`}</div>
+    <div class="num money ${a.status === 'aprovada' ? '' : 'faded'}">${rate == null ? '—' : fmtBRL(a.pts * rate)}</div>
+    <div class="c-status"><span class="st ${st.cls}">${st.label}</span>${a.note ? `<small class="st-note">${esc(a.note)}</small>` : ''}</div>
+    <div class="c-actions">${actions}</div>
+  </div>`;
+}
+
+/* ============================================================
+   RANKING + BUFF (todos)
+   ============================================================ */
+function rankLabel() { const w = startOfWeek(ui.day), e = addDays(w, 6); return `semana ${w.getDate()}–${e.getDate()} ${MES[e.getMonth()]} · ${MESL[ui.day.getMonth()]}`; }
+function viewRanking() {
+  if (!designers().length) return welcome();
+  const w = startOfWeek(ui.day), wEnd = addDays(w, 6);
+  const mFrom = new Date(ui.day.getFullYear(), ui.day.getMonth(), 1), mTo = new Date(ui.day.getFullYear(), ui.day.getMonth() + 1, 0);
+  const week = designers().map(p => ({ p, s: stats(p.id, dkey(w), dkey(wEnd)) })).map(x => ({ ...x, score: x.s.points })).sort((a, b) => b.score - a.score);
+  const month = designers().map(p => ({ p, s: stats(p.id, dkey(mFrom), dkey(mTo)) })).map(x => ({ ...x, score: round2(x.s.points * x.s.buff.mult) })).sort((a, b) => b.score - a.score);
+  return `<section class="page">
+    <div class="rank-grid">
+      ${board('Ranking da semana', `${w.getDate()} a ${wEnd.getDate()} de ${MESL[wEnd.getMonth()]} · pontos aprovados`, week, false)}
+      ${board('Ranking do mês', `${MESL[mFrom.getMonth()]} · pontos aprovados × buff`, month, true)}
+    </div>
+    ${buffArea(mFrom)}
+  </section>`;
+}
+function board(title, sub, list, monthly) {
+  const m = me(), top = list.slice(0, 3), rest = list.slice(3);
+  const order = [top[1], top[0], top[2]];
+  const medal = ['🥇', '🥈', '🥉'];
+  const pod = order.map((x, i) => {
+    if (!x) return '<div class="pod empty"></div>';
+    const pos = list.indexOf(x);
+    return `<div class="pod p${pos + 1} ${x.p.id === m.id ? 'me' : ''}" style="--pc:${x.p.color};--i:${i}">
+      <div class="pod-av">${avatar(x.p, 'xl')}<span class="medal">${medal[pos]}</span></div>
+      <b class="pod-name">${esc(firstName(x.p.name))}</b>
+      <span class="pod-pts">${num(x.score)} <small>pts</small></span>
+      ${monthly && x.s.buff.mult > 1 ? `<span class="pod-buff">${ico('bolt')}${fmtMult(x.s.buff.mult)}</span>` : `<span class="pod-sub">${plural(x.s.cards, 'card', 'cards')}</span>`}
+      <div class="pod-bar"><span>${pos + 1}º</span></div>
+    </div>`;
+  }).join('');
+  const lead = list[0] ? list[0].score : 0;
+  return `<div class="card board">
+    <div class="c-head"><h3>${ico('ranking')} ${title}</h3><span>${sub}</span></div>
+    <div class="podium">${pod}</div>
+    ${rest.length ? `<ol class="rest" start="4">${rest.map((x, i) => `<li class="${x.p.id === m.id ? 'me' : ''}" style="--i:${i}"><span class="lb-pos">${i + 4}</span>${avatar(x.p, 'sm')}<span class="lb-name">${esc(x.p.name)}</span><span class="gap">${lead - x.score > 0 ? `−${fmtPts(lead - x.score)}` : ''}</span><b>${fmtPts(x.score)}</b></li>`).join('')}</ol>` : ''}
+    ${list.every(x => !x.score) ? '<p class="muted small center">Ninguém pontuou ainda nesse período. Bora!</p>' : ''}
+  </div>`;
+}
+function buffArea(mFrom) {
+  const tiers = [...S.settings.buff].sort((a, b) => a.h - b.h);
+  const maxH = Math.max(14, (tiers[tiers.length - 1]?.h || 12) + 2);
+  const pjs = designers().filter(p => p.regime === 'PJ');
+  const cards = pjs.map((p, i) => {
+    const b = monthBuff(p.id, mFrom);
+    const pct = Math.min(100, b.avgH / maxH * 100);
+    return `<div class="buff-card m${String(b.mult).replace('.', '')} ${p.id === me().id ? 'me' : ''}" style="--pc:${p.color};--i:${i}">
+      <div class="bc-top">${avatar(p, 'md')}<div><b>${esc(p.name)}</b><small>${fmtDur(b.minutes)} em ${b.days} dias</small></div><span class="bc-mult">${ico('bolt')}${fmtMult(b.mult)}</span></div>
+      <div class="bc-avg"><b>${fmtNum(b.avgH)}</b><span>h por dia em média</span></div>
+      <div class="bc-track"><i class="bc-fill" style="--w:${pct}%"></i>${tiers.filter(t => t.h > 0).map(t => `<span class="bc-mark" style="left:${t.h / maxH * 100}%"><em>${t.h}h · ${fmtMult(t.mult)}</em></span>`).join('')}</div>
+      <p class="bc-msg">${b.next ? `Faltam <b>${fmtNum(b.next.h - b.avgH)}h por dia</b> de média para ${fmtMult(b.next.mult)}` : 'Buff máximo! 🔥'}</p>
+    </div>`;
+  }).join('');
+  return `<div class="buff-area">
+    <div class="buff-head">
+      <div><h2>${ico('bolt')} Buff de ${MESL[mFrom.getMonth()]}</h2><p>Quem fica mais tempo online multiplica a pontuação do mês. A média conta <b>todos os dias do mês, inclusive fins de semana</b>. Vale só para PJ.</p></div>
+      <div class="buff-tiers">${tiers.map((t, i) => `<div class="bt m${String(t.mult).replace('.', '')}"><span>${i === 0 ? `menos de ${tiers[1]?.h ?? '—'}h/dia` : i === tiers.length - 1 ? `mais de ${t.h}h/dia` : `${t.h}h a ${tiers[i + 1].h}h/dia`}</span><b>${t.mult === 1 ? 'sem buff' : fmtMult(t.mult)}</b></div>`).join('')}</div>
+    </div>
+    ${pjs.length ? `<div class="buff-grid">${cards}</div>` : '<div class="empty-card">Nenhum designer PJ cadastrado.</div>'}
+  </div>`;
+}
 
 /* ============================================================
    MÉTRICAS (igual para todos; valores dos outros ficam ocultos para designers)
@@ -291,49 +441,48 @@ function viewMetricas() {
   const { from, to, label } = period();
   const admin = isAdmin(), m = me();
   const all = designers().map(p => ({ p, s: stats(p.id, from, to) }));
-  const tot = all.reduce((t, { s }) => ({ pay: t.pay + (s.pay || 0), pts: t.pts + s.points, pend: t.pend + s.pending, pendPts: t.pendPts + s.pendingPts, cl: t.cl + s.clients, min: t.min + s.minutes, err: t.err + s.errors + s.refused, acts: t.acts + s.acts.length }), { pay: 0, pts: 0, pend: 0, pendPts: 0, cl: 0, min: 0, err: 0, acts: 0 });
+  const tot = all.reduce((t, { s }) => ({ pay: t.pay + (s.pay || 0), pts: t.pts + s.points, pend: t.pend + s.pending, pendPts: t.pendPts + s.pendingPts, cards: t.cards + s.cards, min: t.min + s.minutes, err: t.err + s.errors + s.refused, cmin: t.cmin + s.avgCardMins * s.cards }), { pay: 0, pts: 0, pend: 0, pendPts: 0, cards: 0, min: 0, err: 0, cmin: 0 });
   const canSee = p => admin || p.id === m.id;
   const lb = (title, sub, key, fmt, money) => {
     const list = [...all].sort((a, b) => key(b.s) - key(a.s)), max = Math.max(1e-9, ...list.map(x => key(x.s)));
     return `<div class="card lb"><div class="c-head"><h3>${title}</h3><span>${sub}</span></div><ol>${list.map(({ p, s }, i) => `<li class="${p.id === m.id ? 'me' : ''}" style="--i:${i}"><span class="lb-pos ${i === 0 && key(s) > 0 ? 'first' : ''}">${i + 1}</span>${avatar(p, 'sm')}<span class="lb-name">${esc(firstName(p.name))}</span><span class="lb-bar"><i style="--w:${key(s) / max * 100}%;background:${p.color}"></i></span><b>${money && !canSee(p) ? '•••' : fmt(s)}</b></li>`).join('')}</ol></div>`;
   };
   return `<section class="page">
-    ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${plural(tot.pend, 'atividade aguardando', 'atividades aguardando')} aprovação</b> · ${fmtPts(tot.pendPts)} pts que ainda não entram no valor</span><em>${admin ? 'Conferir' : 'Ver'} ${ico('right')}</em></button>` : ''}
+    ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${plural(tot.pend, 'card aguardando', 'cards aguardando')} aprovação</b> · ${fmtPts(tot.pendPts)} pts que ainda não entram no valor</span><em>${admin ? 'Conferir' : 'Ver'} ${ico('right')}</em></button>` : ''}
     <div class="kpis">
-      <div class="kpi dark"><span>${admin ? 'Gasto no período' : 'Você recebe'}</span><b>${num(admin ? tot.pay : (all.find(x => x.p.id === m.id)?.s.pay || 0), 'brl')}</b><small>${admin ? `${fmtBRL(tot.cl ? tot.pay / tot.cl : 0)} por cliente` : 'só atividades aprovadas'}</small></div>
-      <div class="kpi"><span>Pontos aprovados</span><b>${num(tot.pts)}</b><small>${plural(tot.acts, 'atividade lançada', 'atividades lançadas')}</small></div>
-      <div class="kpi"><span>Clientes atendidos</span><b>${num(tot.cl, 'int')}</b><small>${fmtNum(tot.cl ? tot.pts / tot.cl : 0)} pts por cliente</small></div>
+      <div class="kpi dark"><span>${admin ? 'Gasto no período' : 'Você recebe'}</span><b>${num(admin ? tot.pay : (all.find(x => x.p.id === m.id)?.s.pay || 0), 'brl')}</b><small>${admin ? `${fmtBRL(tot.cards ? tot.pay / tot.cards : 0)} por card` : 'com buff, só aprovados'}</small></div>
+      <div class="kpi"><span>Pontos aprovados</span><b>${num(tot.pts)}</b><small>${fmtNum(tot.cards ? tot.pts / tot.cards : 0)} pts por card</small></div>
+      <div class="kpi"><span>Cards aprovados</span><b>${num(tot.cards, 'int')}</b><small>${tot.cards ? fmtDur(tot.cmin / tot.cards) : '—'} por card em média</small></div>
       <div class="kpi"><span>Horas online</span><b>${num(tot.min, 'dur')}</b><small>${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h por designer</small></div>
     </div>
     <div class="lb-grid">
       ${lb('Mais tempo online', 'horas no período', s => s.minutes, s => fmtDur(s.minutes))}
-      ${lb('Mais clientes', 'atendidos', s => s.clients, s => `${s.clients}`)}
-      ${lb('Mais pontos', 'aprovados', s => s.points, s => fmtPts(s.points))}
-      ${lb('A receber', 'por designer', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay), true)}
+      ${lb('Mais cards', 'aprovados', s => s.cards, s => `${s.cards}`)}
+      ${lb('Mais cards difíceis', 'marcados como difícil', s => s.hard, s => `${s.hard}`)}
+      ${lb('A receber', 'com buff', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay), true)}
     </div>
     <div class="grid-2">
       <div class="card">${chart(all, from, to)}</div>
       <div class="card">${breakdown(all)}</div>
     </div>
     <div class="card flush">
-      <div class="c-head pad"><h3>Fechamento</h3><span>${esc(label)} · só atividades aprovadas entram no valor</span><span class="sp"></span><button class="btn line sm" data-export-csv>${ico('sheet')}Exportar planilha</button></div>
+      <div class="c-head pad"><h3>Fechamento</h3><span>${esc(label)} · só cards aprovados entram no valor</span><span class="sp"></span><button class="btn line sm" data-export-csv>${ico('sheet')}Exportar planilha</button></div>
       <div class="table-wrap"><table class="grid close">
-        <thead><tr><th>Designer</th><th class="num">Pontos</th><th class="num">Aguardando</th><th class="num">Clientes</th><th class="num">Por dia</th><th class="num">Pts/cliente</th><th class="num">Online</th><th class="num">Média/dia</th><th class="num">Bônus</th><th class="num">Correções</th><th class="num">A receber</th></tr></thead>
+        <thead><tr><th>Designer</th><th class="num">Cards</th><th class="num">Pontos</th><th class="num">Aguardando</th><th class="num">Pts/card</th><th class="num">Tempo/card</th><th class="num">Difíceis</th><th class="num">Online</th><th class="num">Média/dia (mês)</th><th class="num">Buff</th><th class="num">A receber</th></tr></thead>
         <tbody>${[...all].sort((a, b) => b.s.points - a.s.points).map(({ p, s }, i) => `<tr class="${p.id === m.id ? 'me' : ''}" style="--i:${i}">
           <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
-          <td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending || '—'}</td>
-          <td class="num">${s.clients}</td><td class="num">${fmtNum(s.clientsPerDay)}</td><td class="num">${fmtNum(s.ptsPerClient)}</td>
-          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.avgH)}h</td><td class="num"><span class="mult">${fmtMult(s.mult)}</span></td>
-          <td class="num">${s.errors + s.refused || '—'}</td><td class="num money">${canSee(p) ? (s.pay == null ? 'fixo' : fmtBRL(s.pay)) : '•••'}</td></tr>`).join('')}</tbody>
-        ${admin ? `<tfoot><tr><td>Total</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td class="num">${tot.cl}</td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num">${tot.err || '—'}</td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>` : ''}
+          <td class="num">${s.cards}</td><td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending || '—'}</td>
+          <td class="num">${fmtNum(s.ptsPerCard)}</td><td class="num">${s.avgCardMins ? fmtDur(s.avgCardMins) : '—'}</td><td class="num">${s.hard || '—'}</td>
+          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.buff.avgH)}h</td><td class="num">${s.buff.eligible ? `<span class="mult m${String(s.buff.mult).replace('.', '')}">${fmtMult(s.buff.mult)}</span>` : '<span class="muted">CLT</span>'}</td>
+          <td class="num money">${canSee(p) ? (s.pay == null ? 'fixo' : fmtBRL(s.pay)) : '•••'}</td></tr>`).join('')}</tbody>
+        ${admin ? `<tfoot><tr><td>Total</td><td class="num">${tot.cards}</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td></td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>` : ''}
       </table></div>
     </div>
   </section>`;
 }
-
 function chart(all, from, to) {
   const days = [];
-  for (let d = parseKey(from); dkey(d) <= to; d = addDays(d, 1)) if (!isWeekendDate(d) || all.some(({ s }) => s.perDay[dkey(d)])) days.push(dkey(d));
+  for (let d = parseKey(from); dkey(d) <= to; d = addDays(d, 1)) days.push(dkey(d));
   const sums = days.map(k => all.reduce((s, x) => s + (x.s.perDay[k] || 0), 0));
   const max = Math.max(1, ...sums), mag = Math.pow(10, Math.floor(Math.log10(max / 4)));
   const step = [1, 2, 2.5, 5, 10, 20].map(x => x * mag).find(x => Math.ceil(max / x) <= 5);
@@ -352,11 +501,11 @@ function chart(all, from, to) {
   return `<div class="c-head"><h3>Pontos aprovados por dia</h3></div>${svg}<div class="legend">${all.map(({ p }) => `<span><i style="background:${p.color}"></i>${esc(firstName(p.name))}</span>`).join('')}</div>`;
 }
 function breakdown(all) {
-  const by = {}; all.forEach(({ s }) => Object.entries(s.byType).forEach(([k, v]) => { by[k] = (by[k] || 0) + v; }));
+  const by = {}; all.forEach(({ s }) => Object.entries(s.byKind).forEach(([k, v]) => { by[k] = (by[k] || 0) + v; }));
   const total = Object.values(by).reduce((a, b) => a + b, 0), keys = Object.keys(by).sort((a, b) => by[b] - by[a]);
   return `<div class="c-head"><h3>De onde vêm os pontos</h3><span>por tipo de atividade</span></div>
-    ${total ? `<div class="stackbar">${keys.map((k, i) => `<i style="--w:${by[k] / total * 100}%;background:${typeOf(k).color};--i:${i}"></i>`).join('')}</div>
-    <ul class="bd">${keys.map(k => `<li style="--tc:${typeOf(k).color}"><i></i><span>${k === 'extra' ? 'Atividades extras' : esc(typeOf(k).label)}</span><b>${fmtPts(by[k])} pts</b><em>${Math.round(by[k] / total * 100)}%</em></li>`).join('')}</ul>` : '<p class="muted">Nenhum ponto aprovado no período.</p>'}`;
+    ${total ? `<div class="stackbar">${keys.map((k, i) => `<i style="--w:${by[k] / total * 100}%;background:${kindOf(k).color};--i:${i}"></i>`).join('')}</div>
+    <ul class="bd">${keys.map(k => `<li style="--tc:${kindOf(k).color}"><i></i><span>${esc(kindOf(k).label)}</span><b>${fmtPts(by[k])} pts</b><em>${Math.round(by[k] / total * 100)}%</em></li>`).join('')}</ul>` : '<p class="muted">Nenhum ponto aprovado no período.</p>'}`;
 }
 
 /* ============================================================
@@ -378,35 +527,46 @@ function cfgEquipe() {
     <button class="person add" data-add-person><span>${ico('plus')}</span>Novo designer</button>
   </div>`;
 }
+function cfgList(key, title, sub, fields, opts = {}) {
+  const list = S.settings[key];
+  return `<div class="card cfg-card"><div class="c-head"><h3>${title}</h3><span>${sub}</span></div>
+    <ul class="pt-list">${list.map((t, i) => `<li class="pt-row ${fields.includes('pts') ? '' : 'nopts'}" style="--tc:${t.color || '#E4E4E7'};--i:${i}">
+      ${fields.includes('color') ? `<label class="clr"><input type="color" data-cl="${key}|${i}|color" value="${t.color}"><i></i></label>` : '<span class="clr-dot"></span>'}
+      <div class="pt-main"><input class="pt-label" data-cl="${key}|${i}|label" value="${esc(t.label)}">${fields.includes('hint') ? `<input class="pt-hint" data-cl="${key}|${i}|hint" value="${esc(t.hint || '')}" placeholder="descrição">` : ''}</div>
+      ${fields.includes('pts') ? `<label class="pt-val">${opts.plus ? '<span>+</span>' : ''}<input type="number" min="0" step="0.25" data-cl="${key}|${i}|pts" value="${t.pts}"><span>pt</span></label>` : ''}
+      ${opts.removable && !(opts.keep || []).includes(t.id) ? `<button class="ab no" data-cl-del="${key}|${i}" data-tip="Remover">${ico('trash')}</button>` : '<span></span>'}
+    </li>`).join('')}</ul>
+    ${opts.addable ? `<button class="btn line sm" data-cl-add="${key}">${ico('plus')}${opts.addLabel}</button>` : ''}
+  </div>`;
+}
 function cfgPontos() {
   const st = S.settings;
-  const rows = st.itemTypes.map((t, i) => `<li class="pt-row" style="--tc:${t.color};--i:${i}">
-    <label class="clr"><input type="color" data-tf="${t.id}|color" value="${t.color}"><i></i></label>
-    <div class="pt-main"><input class="pt-label" data-tf="${t.id}|label" value="${esc(t.label)}"><input class="pt-hint" data-tf="${t.id}|hint" value="${esc(t.hint || '')}" placeholder="descrição"></div>
-    <label class="pt-max"><span>Limite por cliente</span><input type="number" min="0" step="1" data-tf="${t.id}|max" value="${t.max || ''}" placeholder="sem limite"></label>
-    <label class="pt-val"><input type="number" min="0" step="0.25" data-tf="${t.id}|pts" value="${t.pts}"><span>pt</span></label>
-    ${t.id === 'logo' ? '<span></span>' : `<button class="ab no" data-del-type="${t.id}" data-tip="Remover">${ico('trash')}</button>`}
-  </li>`).join('');
-  const tiers = [...st.tiers].sort((a, b) => a.h - b.h).map((t, i, arr) => `<div class="tier" style="--lvl:${i}">
+  const tiers = [...st.buff].sort((a, b) => a.h - b.h).map((t, i, arr) => `<div class="tier" style="--lvl:${i}">
     <span>a partir de</span><label><input type="number" min="0" step="0.5" data-tier="${i}|h" value="${t.h}">h/dia</label>
     <label class="tm">×<input type="number" min="0" step="0.05" data-tier="${i}|mult" value="${t.mult}"></label>
-    ${arr.length > 1 ? `<button class="tier-x" data-del-tier="${i}" aria-label="remover faixa">${ico('x')}</button>` : ''}</div>`).join('');
+    ${arr.length > 1 && i > 0 ? `<button class="tier-x" data-del-tier="${i}" aria-label="remover faixa">${ico('x')}</button>` : ''}</div>`).join('');
   return `<div class="grid-pts">
-    <div class="card"><div class="c-head"><h3>Tabela de pontos</h3><span>o designer escolhe a atividade e o ponto já vem calculado</span></div>
-      <ul class="pt-list">${rows}</ul><button class="btn line sm" data-add-type>${ico('plus')}Novo tipo de atividade</button></div>
     <div class="col">
-      <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>antes do bônus</span></div>
+      ${cfgList('kinds', 'Tipos de atividade', 'a base de cada card', ['color', 'hint', 'pts'], { removable: true, addable: true, addLabel: 'Novo tipo', keep: ['logo'] })}
+      <div class="grid-2">
+        ${cfgList('logoQ', 'Logo recebida', 'soma na base', ['pts'], { plus: true, removable: true, addable: true, addLabel: 'Nova opção', keep: ['alta'] })}
+        ${cfgList('adds', 'Adicionais', 'por unidade', ['pts'], { plus: true, removable: true, addable: true, addLabel: 'Novo adicional' })}
+      </div>
+      ${cfgList('diffs', 'Dificuldade', 'cor da linha do card · não muda pontos', ['color'], {})}
+    </div>
+    <div class="col">
+      <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>antes do buff</span></div>
         <label class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"></label></div>
-      <div class="card"><div class="c-head"><h3>Bônus por horas online</h3><span>média por dia trabalhado</span></div>
+      <div class="card"><div class="c-head"><h3>${ico('bolt')} Buff do mês</h3><span>só PJ · média por dia do mês, com fins de semana</span></div>
         <div class="tiers">${tiers}</div><button class="btn line sm" data-add-tier>${ico('plus')}Faixa</button>
-        <p class="muted small">A receber = pontos aprovados × ${fmtBRL(st.pointValue)} × bônus.</p></div>
+        <p class="muted small">A receber = pontos aprovados × ${fmtBRL(st.pointValue)} × buff.</p></div>
     </div>
   </div>`;
 }
 function cfgHoras() {
   const { days } = period(), today = dkey(new Date()), ds = designers();
   if (!ds.length) return '<div class="empty-card">Cadastre designers primeiro.</div>';
-  return `<div class="card flush"><div class="c-head pad"><h3>Horas online</h3><span>digite como 8:30 ou 8,5 · salva sozinho</span></div>
+  return `<div class="card flush"><div class="c-head pad"><h3>Horas online</h3><span>digite como 8:30 ou 8,5 · salva sozinho · fins de semana contam para o buff</span></div>
     <div class="table-wrap"><table class="hours">
       <thead><tr><th>Designer</th>${days.map(d => `<th class="${dkey(d) === today ? 'today' : ''}">${WD[d.getDay()]}<b>${d.getDate()}</b></th>`).join('')}${days.length > 1 ? '<th>Total</th>' : ''}</tr></thead>
       <tbody>${ds.map(p => { const tot = days.reduce((s, d) => s + onlineMin(p.id, dkey(d)), 0); return `<tr><td class="h-who">${avatar(p, 'sm')}<span>${esc(firstName(p.name))}</span></td>${days.map(d => { const k = dkey(d), v = onlineMin(p.id, k); return `<td class="${isWeekendDate(d) ? 'we' : ''}"><input class="hm ${v ? 'has' : ''}" data-online="${p.id}|${k}" value="${toHM(v)}" placeholder="—" inputmode="decimal"></td>`; }).join('')}${days.length > 1 ? `<td class="h-tot">${fmtDur(tot)}</td>` : ''}</tr>`; }).join('')}</tbody>
@@ -426,22 +586,21 @@ function cfgDados() {
    ============================================================ */
 let actCtx = null, editingPerson = null, hoursCtx = null;
 function openAct(mode, a) {
-  const admin = isAdmin();
-  actCtx = { mode, id: a ? a.id : null };
-  const F = $('#actForm').elements;
-  F.type.innerHTML = S.settings.itemTypes.map(t => `<option value="${t.id}">${esc(t.label)} · ${fmtPts(t.pts)} pt</option>`).join('') + (admin ? '<option value="extra">Extra · pontos livres</option>' : '');
-  F.designerId.innerHTML = designers().map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  $('#actWho').hidden = !admin; $('#actAdmin').hidden = !admin;
-  F.designerId.value = a.designerId; F.date.value = a.date; F.time.value = a.time || ''; F.client.value = a.client || ''; F.luluId.value = a.luluId || '';
-  F.type.value = a.extra ? 'extra' : a.type; F.qty.value = a.qty || 1; F.pts.value = a.pts; F.desc.value = a.desc || ''; F.status.value = a.status; F.note.value = a.note || '';
-  F.pts.readOnly = !admin;
-  if (mode === 'erro' || mode === 'recusada') F.status.value = mode;
-  $('#actTitle').textContent = { edit: admin ? 'Editar atividade' : (a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar atividade'), erro: 'Pedir correção', recusada: 'Recusar atividade' }[mode];
-  $('#actHint').textContent = mode === 'erro' ? 'Diga o que precisa corrigir. O designer vê o comentário e reenvia.' : mode === 'recusada' ? 'Diga o motivo. Atividade recusada não entra no valor.' : (!admin && a.note ? `Comentário da gestão: ${a.note}` : '');
-  $('#actErr').textContent = '';
-  $('#delAct').hidden = !admin;
+  const admin = isAdmin(), ro = mode === 'view';
+  actCtx = { mode, id: a.id };
+  const titles = { edit: admin ? 'Editar card' : (a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar card'), erro: 'Pedir correção', recusada: 'Recusar card', view: 'Detalhes do card' };
+  const hint = mode === 'erro' ? 'Diga o que precisa corrigir. O designer vê o comentário e reenvia.' : mode === 'recusada' ? 'Diga o motivo. Card recusado não entra no valor.' : (a.note ? `Comentário da gestão: ${a.note}` : '');
+  const sc = scoreOf(a), override = Math.abs(sc.total - a.pts) > 0.001 ? a.pts : null;
+  $('#actForm').innerHTML = `
+    <header><h2>${titles[mode]}</h2><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
+    ${hint ? `<p class="dlg-hint">${esc(hint)}</p>` : ''}
+    <fieldset class="cp-grid dlg" ${ro ? 'disabled' : ''}><div class="cp-fields">${cardFields(a)}</div>${receipt(a, { override })}</fieldset>
+    ${admin ? `<div class="adm-box"><label class="f"><span>Status</span><select name="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${(mode === 'erro' || mode === 'recusada' ? mode : a.status) === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label><label class="f"><span>Comentário para o designer</span><input name="note" value="${esc(a.note || '')}" placeholder="ex.: a logo não era de baixa qualidade" autocomplete="off"></label></div>` : ''}
+    <p class="err" id="actErr" role="alert"></p>
+    <footer>${admin ? '<button type="button" class="btn line danger" id="delAct">Excluir</button>' : ''}<span class="sp"></span><button type="button" class="btn line" data-close>${ro ? 'Fechar' : 'Cancelar'}</button>${ro ? '' : '<button type="submit" class="btn dark">Salvar</button>'}</footer>`;
   $('#actDlg').showModal();
-  (mode === 'erro' || mode === 'recusada' ? F.note : F.client).focus();
+  const f = (mode === 'erro' || mode === 'recusada') ? $('#actForm').elements.note : null;
+  if (f) f.focus();
 }
 function openPerson(p) {
   editingPerson = p || null;
@@ -455,7 +614,7 @@ function openPerson(p) {
 }
 function openHours(pid) {
   const p = person(pid), { days, label } = period();
-  hoursCtx = { pid, days: days.map(dkey) };
+  hoursCtx = { pid };
   $('#hTitle').innerHTML = `${avatar(p, 'sm')} Horas online · ${esc(firstName(p.name))}`;
   $('#hSub').textContent = label;
   $('#hGrid').innerHTML = days.map(d => { const k = dkey(d), v = onlineMin(pid, k); return `<label class="${isWeekendDate(d) ? 'we' : ''}"><span>${WD[d.getDay()]} ${d.getDate()}</span><input data-hk="${k}" value="${toHM(v)}" placeholder="—" inputmode="decimal"></label>`; }).join('');
@@ -476,54 +635,63 @@ function toast(m, kind = 'ok') {
 const act = id => S.activities.find(a => a.id === id);
 const who = a => firstName((person(a.designerId) || {}).name || '?');
 
-/* ripple em todo botão */
 function ripple(e) {
-  const b = e.target.closest('.btn, .seg button, .rail-nav button, .ab, .chip.edit, .today-btn, .icon-btn, .person.add, .alert-bar');
+  const b = e.target.closest('.btn, .seg button, .rail-nav button, .ab, .chip.edit, .today-btn, .icon-btn, .person.add, .alert-bar, .tile span, .pill span, .qt, .stepper-n button');
   if (!b || b.disabled) return;
-  const r = b.getBoundingClientRect(), s = Math.max(r.width, r.height) * 1.6;
+  const host = b.matches('.tile span, .pill span') ? b : b;
+  const r = host.getBoundingClientRect(), s = Math.max(r.width, r.height) * 1.6;
   const el = document.createElement('i');
   el.className = 'rip'; el.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`;
-  b.appendChild(el); setTimeout(() => el.remove(), 600);
+  host.appendChild(el); setTimeout(() => el.remove(), 600);
 }
 
-function quickPreview() {
-  const f = $('#quickForm'); if (!f) return;
-  const F = f.elements, qty = Math.max(1, parseInt(F.qty.value, 10) || 1), extra = F.type.value === 'extra';
-  if (!isAdmin() || document.activeElement !== F.pts) { if (!extra) F.pts.value = fmtPts(suggestedPts(F.type.value, qty)); else if (!F.pts.value || F.pts.dataset.auto) F.pts.value = '1'; }
-  F.client.placeholder = extra ? 'Descreva a atividade extra' : 'Nome do cliente';
-  const did = F.designerId ? F.designerId.value : me().id, t = typeOf(F.type.value);
-  let msg = '';
-  if (t.max && F.client.value.trim()) {
-    const used = S.activities.filter(x => x.designerId === did && x.type === t.id && x.status !== 'recusada' && norm(x.client) === norm(F.client.value)).reduce((s, x) => s + (x.qty || 1), 0);
-    if (used + qty > t.max) msg = `${t.label} tem limite de ${t.max} por cliente (já tem ${used}). O excedente pode ser recusado.`;
+function saveCardFromForm(form, existing) {
+  const admin = isAdmin(), c = readCard(form);
+  const err = msg => { const el = form.querySelector('#actErr') || form.querySelector('.rc-err'); if (el) { el.textContent = msg; } toast(msg, 'warn'); };
+  if (!c.client) { err('Qual o cliente?'); const f = form.elements.client; f.focus(); f.closest('.f').classList.add('shake'); setTimeout(() => f.closest('.f').classList.remove('shake'), 500); return null; }
+  const sc = scoreOf(c);
+  const pts = admin && c.ptsOverride != null ? c.ptsOverride : sc.total;
+  const data = { designerId: c.designerId, date: c.date, time: c.time, client: c.client, name: c.name, luluId: c.luluId, kind: c.kind, logoQ: c.logoQ, adds: c.adds, diff: c.diff, mins: c.mins, details: c.details, pts };
+  if (existing) {
+    Object.assign(existing, data);
+    if (admin) { existing.status = form.elements.status.value; existing.note = form.elements.note.value.trim(); }
+    else if (existing.status === 'erro') existing.status = 'pendente';
+    return existing;
   }
-  const w = $('#qWarn'); w.textContent = msg; w.classList.toggle('on', !!msg);
+  const a = { id: uid(), ...data, status: admin ? 'aprovada' : 'pendente', note: '', createdAt: new Date().toISOString(), by: admin ? 'admin' : 'designer' };
+  S.activities.push(a);
+  return a;
 }
 
 function bind() {
   document.addEventListener('pointerdown', ripple);
   document.addEventListener('click', e => {
     const t = e.target; let el;
+    if ((el = t.closest('[data-step]'))) { const [id, d] = el.dataset.step.split('|'), inp = el.closest('form').elements['add_' + id]; inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + +d); inp.classList.remove('bump'); void inp.offsetWidth; inp.classList.add('bump'); refreshReceipt(el.closest('form')); return; }
+    if ((el = t.closest('[data-qt]'))) { const f = el.closest('form'); f.elements.mins.value = toHM(+el.dataset.qt); f.querySelectorAll('.qt').forEach(q => q.classList.toggle('on', q === el)); refreshReceipt(f); return; }
     if (t.closest('dialog')) return;
-    if ((el = t.closest('#nav [data-view]'))) { go(el.dataset.view); return; }
+    if ((el = t.closest('#nav [data-view]'))) { if (el.dataset.view === 'ranking') ui.day = ui.day || new Date(); go(el.dataset.view); return; }
     if ((el = t.closest('[data-period]'))) { ui.limit = {}; ui.period = el.dataset.period; ui.enter = true; render(); return; }
     if ((el = t.closest('[data-shift]'))) { shiftPeriod(+el.dataset.shift); ui.enter = true; render(); return; }
+    if ((el = t.closest('[data-rshift]'))) { const n = +el.dataset.rshift; ui.day = n ? addDays(ui.day, 7 * n) : new Date(); ui.enter = true; render(); return; }
     if ((el = t.closest('[data-status]'))) { ui.status = el.dataset.status; render(); return; }
     if ((el = t.closest('[data-cfg]'))) { ui.cfg = el.dataset.cfg; ui.enter = true; render(); return; }
+    if (t.closest('[data-toggle-composer]')) { ui.composer = !ui.composer; t.closest('.composer').classList.toggle('closed'); return; }
     if ((el = t.closest('[data-more]'))) { ui.limit[el.dataset.more] = (ui.limit[el.dataset.more] || 25) + 50; render(); return; }
     if ((el = t.closest('[data-hours]'))) { e.stopPropagation(); openHours(el.dataset.hours); return; }
     if ((el = t.closest('[data-approve-all]'))) {
       const { from, to } = period();
       const list = S.activities.filter(a => a.designerId === el.dataset.approveAll && a.status === 'pendente' && inRange(a.date, from, to));
       list.forEach(a => { a.status = 'aprovada'; ui.flash[a.id] = 'ok'; });
-      addLog(`aprovou ${list.length} atividades de ${firstName(person(el.dataset.approveAll).name)}`);
-      save(); render(); toast(`${plural(list.length, 'atividade aprovada', 'atividades aprovadas')}`); return;
+      addLog(`aprovou ${list.length} cards de ${firstName(person(el.dataset.approveAll).name)}`);
+      save(); render(); toast(plural(list.length, 'card aprovado', 'cards aprovados')); return;
     }
     if ((el = t.closest('[data-toggle]'))) { if (t.closest('button, select, input')) return; if (visiblePeople().length === 1) return; ui.closed[el.dataset.toggle] = !ui.closed[el.dataset.toggle]; el.closest('.block').classList.toggle('closed'); return; }
-    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { a.status = 'aprovada'; a.note = ''; ui.flash[a.id] = 'ok'; addLog(`aprovou: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)`); save(); render(); toast('Aprovada'); } return; }
+    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { a.status = 'aprovada'; a.note = ''; ui.flash[a.id] = 'ok'; addLog(`aprovou: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)`); save(); render(); toast('Card aprovado'); } return; }
     if ((el = t.closest('[data-mark]'))) { const [id, st] = el.dataset.mark.split('|'); const a = act(id); if (a) openAct(st, a); return; }
     if ((el = t.closest('[data-edit-act]'))) { const a = act(el.dataset.editAct); if (a) openAct('edit', a); return; }
-    if ((el = t.closest('[data-del-act]'))) { const a = act(el.dataset.delAct); if (a && confirm('Excluir esta atividade?')) { S.activities = S.activities.filter(x => x !== a); save(); render(); toast('Excluída', 'info'); } return; }
+    if ((el = t.closest('[data-view-act]'))) { const a = act(el.dataset.viewAct); if (a) openAct('view', a); return; }
+    if ((el = t.closest('[data-del-act]'))) { const a = act(el.dataset.delAct); if (a && confirm('Excluir este card?')) { S.activities = S.activities.filter(x => x !== a); save(); render(); toast('Excluído', 'info'); } return; }
     if (t.closest('[data-go-pending]')) { ui.status = 'pendente'; ui.who = 'all'; go('atividades'); return; }
     if (t.closest('[data-export-csv]')) { exportCSV(); return; }
     if (t.closest('[data-add-person]')) { openPerson(); return; }
@@ -531,27 +699,31 @@ function bind() {
     if ((el = t.closest('[data-del-person]'))) {
       const p = person(el.dataset.delPerson); if (!p) return;
       const n = S.activities.filter(a => a.designerId === p.id).length;
-      if (!confirm(`Remover ${p.name}?${n ? ` As ${n} atividades dele(a) também serão apagadas.` : ''}`)) return;
+      if (!confirm(`Remover ${p.name}?${n ? ` Os ${n} cards dele(a) também serão apagados.` : ''}`)) return;
       S.people = S.people.filter(x => x !== p); S.activities = S.activities.filter(a => a.designerId !== p.id);
       Object.values(S.online).forEach(d => delete d[p.id]); addLog(`removeu ${p.name}`); save(); render(); toast(`${firstName(p.name)} removido(a)`, 'info'); return;
     }
-    if (t.closest('[data-add-type]')) { S.settings.itemTypes.push({ id: 't' + uid().slice(0, 5), label: 'Nova atividade', pts: 0.5, max: null, color: PALETTE[S.settings.itemTypes.length % PALETTE.length], hint: '' }); save(); render(); toast('Tipo criado'); return; }
-    if ((el = t.closest('[data-del-type]'))) { const id = el.dataset.delType; if (S.activities.some(a => a.type === id) && !confirm('Já existem atividades desse tipo. Remover mesmo assim?')) return; S.settings.itemTypes = S.settings.itemTypes.filter(x => x.id !== id); save(); render(); return; }
-    if (t.closest('[data-add-tier]')) { const l = [...S.settings.tiers].sort((a, b) => a.h - b.h).pop() || { h: 0, mult: 1 }; S.settings.tiers.push({ h: l.h + 2, mult: Math.round((l.mult + .1) * 100) / 100 }); save(); render(); return; }
-    if ((el = t.closest('[data-del-tier]'))) { const s = [...S.settings.tiers].sort((a, b) => a.h - b.h); s.splice(+el.dataset.delTier, 1); S.settings.tiers = s; save(); render(); return; }
+    if ((el = t.closest('[data-cl-add]'))) {
+      const key = el.dataset.clAdd, list = S.settings[key];
+      list.push({ id: key[0] + uid().slice(0, 5), label: key === 'kinds' ? 'Novo tipo' : key === 'logoQ' ? 'Nova opção' : 'Novo adicional', pts: key === 'kinds' ? 1 : 0.5, color: PALETTE[list.length % PALETTE.length], hint: '' });
+      save(); render(); toast('Criado'); return;
+    }
+    if ((el = t.closest('[data-cl-del]'))) { const [key, i] = el.dataset.clDel.split('|'); if (!confirm('Remover esta opção? Cards antigos mantêm os pontos que têm.')) return; S.settings[key].splice(+i, 1); save(); render(); return; }
+    if (t.closest('[data-add-tier]')) { const l = [...S.settings.buff].sort((a, b) => a.h - b.h).pop() || { h: 0, mult: 1 }; S.settings.buff.push({ h: l.h + 2, mult: Math.round((l.mult + .5) * 100) / 100 }); save(); render(); return; }
+    if ((el = t.closest('[data-del-tier]'))) { const s = [...S.settings.buff].sort((a, b) => a.h - b.h); s.splice(+el.dataset.delTier, 1); S.settings.buff = s; save(); render(); return; }
     if ((el = t.closest('[data-io]'))) { io(el.dataset.io); return; }
   });
 
   document.addEventListener('change', e => {
     const t = e.target;
-    if (t.id === 'meSel') { ui.meId = t.value; localStorage.setItem('dede.me', ui.meId); ui.who = 'all'; ui.enter = true; render(); toast(`Você está como ${firstName(me().name)}`, 'info'); return; }
-    if (t.matches('[data-who]')) { ui.who = t.value; ui.enter = true; render(); return; }
+    if (t.id === 'meSel') { ui.meId = t.value; localStorage.setItem('dede.me', ui.meId); ui.who = 'all'; ui.draft = null; ui.enter = true; render(); toast(`Você está como ${firstName(me().name)}`, 'info'); return; }
+    if (t.matches('[data-who]')) { ui.who = t.value; ui.draft = null; ui.enter = true; render(); return; }
     if (t.matches('[data-online]')) {
       const [pid, k] = t.dataset.online.split('|'), min = parseHM(t.value);
       if (min > 24 * 60) { toast('Mais de 24h num dia? Confere.', 'warn'); t.value = toHM(onlineMin(pid, k)); return; }
       setOnline(pid, k, min); addLog(`lançou ${fmtDur(min)} online para ${firstName(person(pid).name)} em ${fmtDay(k)}`); save();
       t.value = toHM(min); t.classList.toggle('has', !!min); t.classList.add('saved'); setTimeout(() => t.classList.remove('saved'), 900);
-      const row = t.closest('tr'), tot = row && row.querySelector('.h-tot'); if (tot) tot.textContent = fmtDur(hoursCtxTotal(pid));
+      const tot = t.closest('tr')?.querySelector('.h-tot'); if (tot) tot.textContent = fmtDur(period().days.reduce((s, d) => s + onlineMin(pid, dkey(d)), 0));
       return;
     }
     if (t.matches('[data-pts]')) {
@@ -561,39 +733,32 @@ function bind() {
     }
     if (t.matches('[data-pay]')) { const p = person(t.dataset.pay); if (p) { p.payByPoints = t.checked; save(); toast(t.checked ? 'Recebe por pontos' : 'Valor fixo', 'info'); } return; }
     if (t.matches('[data-setting]')) { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) { S.settings[t.dataset.setting] = v; save(); toast('Valor do ponto atualizado'); } return; }
-    if (t.matches('[data-tf]')) {
-      const [id, f] = t.dataset.tf.split('|'), ty = S.settings.itemTypes.find(x => x.id === id); if (!ty) return;
-      if (f === 'pts') { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) ty.pts = v; } else if (f === 'max') { const v = parseInt(t.value, 10); ty.max = v > 0 ? v : null; } else ty[f] = t.value;
-      save(); if (f === 'color') render(); else toast('Tabela atualizada'); return;
+    if (t.matches('[data-cl]')) {
+      const [key, i, f] = t.dataset.cl.split('|'), item = S.settings[key][+i]; if (!item) return;
+      if (f === 'pts') { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) item.pts = v; } else item[f] = t.value;
+      save(); if (f === 'color') render(); else toast('Atualizado'); return;
     }
-    if (t.matches('[data-tier]')) { const [i, f] = t.dataset.tier.split('|'), s = [...S.settings.tiers].sort((a, b) => a.h - b.h), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings.tiers = s; save(); render(); toast('Bônus atualizado'); return; }
-    if (t.closest('#quickForm')) { if (t.name === 'designerId') { const keep = t.value; render(); $('#quickForm').elements.designerId.value = keep; } quickPreview(); }
+    if (t.matches('[data-tier]')) { const [i, f] = t.dataset.tier.split('|'), s = [...S.settings.buff].sort((a, b) => a.h - b.h), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings.buff = s; save(); render(); toast('Buff atualizado'); return; }
+    if (t.closest('[data-cardform]')) { if (t.name === 'designerId' && t.form.id === 'quickForm') { ui.draft = { ...readCard(t.form), designerId: t.value }; render(); return; } refreshReceipt(t.closest('form')); }
   });
 
   document.addEventListener('input', e => {
     if (e.target.matches('[data-q]')) { ui.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('[data-q]'); n.focus(); n.setSelectionRange(pos, pos); return; }
-    if (e.target.closest('#quickForm') && e.target.name !== 'pts') quickPreview();
+    if (e.target.closest('[data-cardform]')) refreshReceipt(e.target.closest('form'));
   });
 
   document.addEventListener('submit', e => {
     if (e.target.id !== 'quickForm') return;
     e.preventDefault();
-    const F = e.target.elements, admin = isAdmin(), extra = F.type.value === 'extra';
-    const client = F.client.value.trim();
-    if (!client) { const w = $('#qWarn'); w.textContent = extra ? 'Descreva a atividade extra.' : 'Qual o cliente?'; w.classList.add('on'); F.client.focus(); F.client.closest('.f').classList.add('shake'); setTimeout(() => F.client.closest('.f').classList.remove('shake'), 500); return; }
-    const qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
-    const pts = admin ? Math.max(0, parseFloat(String(F.pts.value).replace(',', '.')) || 0) : suggestedPts(F.type.value, qty);
-    const did = admin ? F.designerId.value : me().id;
-    const a = { id: uid(), designerId: did, date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()), client, luluId: F.luluId.value.trim(), type: F.type.value, qty, pts, status: admin ? 'aprovada' : 'pendente', note: '', extra, desc: extra ? client : '', createdAt: new Date().toISOString(), by: admin ? 'admin' : 'designer' };
-    S.activities.push(a); ui.flash[a.id] = 'new';
-    if (admin) addLog(`lançou para ${who(a)}: ${extra ? 'extra · ' : ''}${client} (${fmtPts(pts)} pts)`);
+    const a = saveCardFromForm(e.target, null); if (!a) return;
+    ui.flash[a.id] = 'new';
+    if (isAdmin()) addLog(`lançou para ${who(a)}: ${a.client} (${fmtPts(a.pts)} pts)`);
     save();
-    const keep = { type: F.type.value, client: extra ? '' : client, lulu: extra ? '' : F.luluId.value, did };
+    // mantém dia, hora e designer; limpa o resto
+    ui.draft = { ...emptyCard(a.designerId), date: a.date };
     render();
-    const N = $('#quickForm').elements;
-    if (N.designerId) N.designerId.value = keep.did;
-    N.client.value = keep.client; N.luluId.value = keep.lulu; N.type.value = keep.type === 'logo' ? 'var_livre' : keep.type; quickPreview(); N.type.focus();
-    toast(`${a.extra ? 'Extra' : typeOf(a.type).label}${qty > 1 ? ' ×' + qty : ''} · ${fmtPts(pts)} ${pts === 1 ? 'ponto' : 'pontos'}${admin ? '' : ' · aguardando aprovação'}`);
+    const N = $('#quickForm').elements; N.client.focus();
+    toast(`Card lançado · ${fmtPts(a.pts)} ${a.pts === 1 ? 'ponto' : 'pontos'}${isAdmin() ? '' : ' · aguardando aprovação'}`);
   });
 
   $$('dialog').forEach(dl => {
@@ -601,22 +766,17 @@ function bind() {
     dl.addEventListener('cancel', e => { e.preventDefault(); closeDlg(dl); });
   });
 
-  $('#actForm').addEventListener('change', e => { if (['type', 'qty'].includes(e.target.name) && (!isAdmin() || e.target.form.elements.type.value !== 'extra')) e.target.form.elements.pts.value = suggestedPts(e.target.form.elements.type.value, +e.target.form.elements.qty.value || 1); });
   $('#actForm').addEventListener('submit', e => {
     e.preventDefault();
-    const F = e.target.elements, admin = isAdmin(), extra = F.type.value === 'extra', client = F.client.value.trim();
-    if (!client) { $('#actErr').textContent = 'Qual o cliente?'; return; }
-    if ((actCtx.mode === 'erro' || actCtx.mode === 'recusada') && !F.note.value.trim()) { $('#actErr').textContent = 'Escreva um comentário para o designer.'; return; }
-    const qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
-    const a = act(actCtx.id);
-    Object.assign(a, { date: F.date.value, time: F.time.value, client, luluId: F.luluId.value.trim(), type: F.type.value, qty, desc: F.desc.value.trim(), extra, pts: admin ? Math.max(0, parseFloat(String(F.pts.value).replace(',', '.')) || 0) : suggestedPts(F.type.value, qty) });
-    if (admin) { a.designerId = F.designerId.value; a.status = F.status.value; a.note = F.note.value.trim(); addLog(`${STATUS[a.status].label.toLowerCase()}: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`); }
-    else if (a.status === 'erro') a.status = 'pendente';
+    const a = act(actCtx.id), admin = isAdmin();
+    if (admin && (e.target.elements.status.value === 'erro' || e.target.elements.status.value === 'recusada') && !e.target.elements.note.value.trim()) { $('#actErr').textContent = 'Escreva um comentário para o designer.'; return; }
+    if (!saveCardFromForm(e.target, a)) return;
+    if (admin) addLog(`${STATUS[a.status].label.toLowerCase()}: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`);
     ui.flash[a.id] = a.status === 'aprovada' ? 'ok' : a.status === 'recusada' || a.status === 'erro' ? 'warn' : 'edit';
     save(); closeDlg($('#actDlg')); render();
-    toast(actCtx.mode === 'erro' ? 'Correção pedida' : actCtx.mode === 'recusada' ? 'Recusada' : (!admin ? 'Reenviada para aprovação' : 'Salvo'), actCtx.mode === 'edit' ? 'ok' : 'warn');
+    toast(actCtx.mode === 'erro' ? 'Correção pedida' : actCtx.mode === 'recusada' ? 'Card recusado' : (!admin ? 'Enviado para aprovação' : 'Salvo'), actCtx.mode === 'edit' ? 'ok' : 'warn');
   });
-  $('#delAct').onclick = () => { if (!actCtx.id || !confirm('Excluir esta atividade?')) return; S.activities = S.activities.filter(a => a.id !== actCtx.id); addLog('excluiu uma atividade'); save(); closeDlg($('#actDlg')); render(); toast('Excluída', 'info'); };
+  $('#actForm').addEventListener('click', e => { if (e.target.id === 'delAct') { if (!confirm('Excluir este card?')) return; S.activities = S.activities.filter(a => a.id !== actCtx.id); addLog('excluiu um card'); save(); closeDlg($('#actDlg')); render(); toast('Excluído', 'info'); } });
 
   $('#personForm').addEventListener('submit', e => {
     e.preventDefault();
@@ -645,18 +805,17 @@ function bind() {
 
   addEventListener('resize', () => after());
 }
-function hoursCtxTotal(pid) { const { days } = period(); return days.reduce((s, d) => s + onlineMin(pid, dkey(d)), 0); }
 function closeDlg(dl) { if (!dl.open) return; dl.classList.add('closing'); setTimeout(() => { dl.classList.remove('closing'); dl.close(); }, 160); }
 
 function exportCSV() {
   const { from, to, label } = period();
   const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Data', 'Hora', 'Cliente', 'Nº lulu', 'Atividade', 'Qtd', 'Pontos', 'Status', 'Comentário da gestão', 'Valor (R$)'].join(';')];
+  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Nº lulu', 'Tipo de atividade', 'Logo recebida', ...S.settings.adds.map(a => a.label), 'Dificuldade', 'Tempo (min)', 'Detalhes', 'Pontos', 'Status', 'Comentário da gestão', 'Valor (R$, sem buff)'].join(';')];
   for (const p of isAdmin() ? designers() : [me()]) {
-    const s = stats(p.id, from, to), rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
+    const s = stats(p.id, from, to);
     for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
       const d = parseKey(a.date);
-      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), a.luluId, q(a.extra ? 'Extra' : typeOf(a.type).label), a.qty, n(a.pts), STATUS[a.status].label, q(a.note), rate != null && a.status === 'aprovada' ? n((a.pts * rate).toFixed(2)) : ''].join(';'));
+      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), q(a.name), a.luluId, q(kindOf(a.kind).label), q(logoOf(a.logoQ).label), ...S.settings.adds.map(ad => (a.adds || {})[ad.id] || 0), diffOf(a.diff).label, a.mins || 0, q(a.details), n(a.pts), STATUS[a.status].label, q(a.note), p.payByPoints && a.status === 'aprovada' ? n((a.pts * S.settings.pointValue).toFixed(2)) : ''].join(';'));
     }
   }
   const el = document.createElement('a');
@@ -668,8 +827,8 @@ function exportCSV() {
 function io(kind) {
   if (kind === 'export') { const el = document.createElement('a'); el.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' })); el.download = `dede-${dkey(new Date())}.json`; document.body.appendChild(el); el.click(); el.remove(); return toast('Exportado'); }
   if (kind === 'import') return $('#importFile').click();
-  if (kind === 'demo') { if (designers().length && !confirm('Carregar o exemplo substitui os dados atuais. Continuar?')) return; S = demoState(); save(); ui.view = 'atividades'; ui.period = 'semana'; ui.enter = true; render(); return toast('Exemplo carregado', 'info'); }
-  if (kind === 'reset') { if (!confirm('Zerar tudo? Designers, atividades e horas serão apagados.')) return; S = normalize({ settings: S.settings }); ui.meId = 'adm'; localStorage.setItem('dede.me', 'adm'); save(); ui.enter = true; render(); return toast('Tudo zerado', 'info'); }
+  if (kind === 'demo') { if (designers().length && !confirm('Carregar o exemplo substitui os dados atuais. Continuar?')) return; S = demoState(); save(); ui.view = 'atividades'; ui.period = 'semana'; ui.draft = null; ui.enter = true; render(); return toast('Exemplo carregado', 'info'); }
+  if (kind === 'reset') { if (!confirm('Zerar tudo? Designers, cards e horas serão apagados.')) return; S = normalize({ settings: S.settings }); ui.meId = 'adm'; localStorage.setItem('dede.me', 'adm'); save(); ui.draft = null; ui.enter = true; render(); return toast('Tudo zerado', 'info'); }
 }
 
 window.dede = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
