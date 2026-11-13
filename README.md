@@ -4,23 +4,21 @@ Painel do time de design da SeuBoné. Os designers lançam o que fizeram no dia.
 
 > **Modo demonstração.** Por enquanto os dados ficam salvos no navegador de quem abre (localStorage). Serve para testar o fluxo e as regras. Para o time inteiro usar ao mesmo tempo, veja "Próximos passos".
 
-## Os 3 menus
+## Menus
+
+Admin e designers usam **as mesmas telas**. O admin só ganha o menu **Configurações** e os botões de conferência nas linhas.
 
 | Menu | Quem vê | O que tem |
 |---|---|---|
-| **Atividades** | todos | **Designer:** um resumo do período (pontos aprovados, o que está aguardando, horas online, bônus e quanto vai receber), uma linha para lançar atividades (data, hora, cliente, nº lulu, tipo e quantidade, com a pontuação já calculada pela tabela) e uma tabela com o status de cada lançamento. Pode editar ou excluir o que ainda não foi aprovado e corrigir o que voltou com erro. **Admin:** a tabela do time inteiro, onde pode aprovar (uma por uma ou todas de uma vez), apontar erro com comentário, recusar, mudar a pontuação direto na célula, editar, criar atividade extra com pontos livres e lançar as **horas online** de cada designer (por dia ou pela grade da semana). |
-| **Equipe** | só admin | Cadastro dos designers (nome, CLT/PJ, e-mail, cor, se recebe por pontos), tabela de pontos (nome, pontos, limite por cliente), valor do ponto, faixas de bônus por horas online, exportar/importar dados e registro do que a gestão fez. |
-| **Métricas** | só admin | Gasto no período, pontos aprovados, clientes atendidos, horas online, aviso de atividades aguardando aprovação, rankings (mais tempo online, mais clientes, gasto por designer, mais pontos por cliente), gráfico de pontos por dia, de onde vêm os pontos e a tabela de fechamento, com exportação para o Excel (.csv). |
-
-O sistema começa zerado, só com a conta da gestão. No primeiro acesso, o admin cadastra os designers. Em **Equipe → carregar exemplo** dá para ver o sistema funcionando com dados de teste.
-
-Para testar como cada pessoa enxerga, troque o usuário no canto superior direito.
+| **Atividades** | todos | Um resumo do período (pontos aprovados, o que está aguardando, horas online, bônus e quanto vai receber), uma linha para lançar atividades (o ponto já vem calculado pela tabela) e uma tabela por designer com o status de cada lançamento. O designer edita, exclui e corrige o que é dele. O admin também escolhe para qual designer está lançando, cria **atividade extra** com pontos livres, aprova (uma por uma ou todas de uma vez), pede correção com comentário, recusa, ajusta os pontos direto na célula e lança as **horas online** clicando no campo "Online" de cada designer. |
+| **Métricas** | todos | Gasto e valor a receber, pontos, clientes, horas, rankings, gráfico por dia, de onde vêm os pontos e a tabela de fechamento com exportação para o Excel. O designer não vê quanto os outros recebem. |
+| **Configurações** | só admin | Equipe (cadastro dos designers), Pontuação (tabela de pontos, valor do ponto e bônus), Horas online (grade da semana) e Dados (exportar, importar, exemplo, zerar e registro da gestão). |
 
 ## Status de uma atividade
 
-**Aguardando** (o designer lançou) → **Aprovada** (entra no valor), **Erro apontado** (volta para o designer com o comentário e ele corrige e reenvia) ou **Recusada** (não entra no valor).
+**Aguardando** (o designer lançou) → **Aprovada** (entra no valor), **Corrigir** (volta para o designer com o comentário, e ele corrige e reenvia) ou **Recusada** (não entra no valor).
 
-## Regras que vêm configuradas (editáveis em Equipe)
+## Regras que vêm configuradas (editáveis em Configurações → Pontuação)
 
 | Atividade | Pontos | Regra |
 |---|---|---|

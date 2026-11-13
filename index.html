@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dedé · SeuBoné</title>
 <meta name="description" content="Dedé: atividades, pontos e horas online do time de design da SeuBoné.">
+<meta name="theme-color" content="#18181B">
 <link rel="icon" href="img/seubone-simbolo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=1">
+<link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
 
@@ -17,69 +18,80 @@
   <aside class="rail" aria-label="Menu">
     <div class="rail-logo" title="Dedé · SeuBoné"><img src="img/seubone-simbolo.png" alt="SeuBoné"></div>
     <nav class="rail-nav" id="nav"></nav>
+    <div class="rail-foot"><b>Dedé</b><span>v2</span></div>
   </aside>
+
   <div class="shell">
     <header class="top">
-      <div class="brand"><b>Dedé</b><span>por</span><img src="img/seubone-logo-escuro.png" alt="SeuBoné"></div>
-      <i class="brand-sep"></i>
-      <h1 class="top-title" id="title"></h1>
+      <div class="title" id="title"></div>
+      <div class="topctl" id="topctl"></div>
       <div class="me" id="me"></div>
     </header>
     <main id="main"></main>
-    <footer class="foot"><span class="demo-dot"></span>modo demonstração · os dados ficam salvos só neste navegador</footer>
+    <footer class="foot"><img src="img/seubone-logo-escuro.png" alt="SeuBoné"><span>Dedé · modo demonstração · os dados ficam salvos só neste navegador</span></footer>
   </div>
 </div>
 
 <!-- Atividade -->
 <dialog id="actDlg">
   <form id="actForm" novalidate>
-    <header><span class="eyebrow" id="actTitle">Atividade</span><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
+    <header><h2 id="actTitle">Atividade</h2><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
     <p class="dlg-hint" id="actHint"></p>
-    <label id="actWho">Designer<select name="designerId"></select></label>
-    <div class="field-row">
-      <label>Data<input type="date" name="date"></label>
-      <label>Hora<input type="time" name="time"></label>
+    <label class="f" id="actWho"><span>Designer</span><select name="designerId"></select></label>
+    <div class="row2">
+      <label class="f"><span>Data</span><input type="date" name="date"></label>
+      <label class="f"><span>Hora</span><input type="time" name="time"></label>
     </div>
-    <div class="field-row">
-      <label>Cliente<input name="client" autocomplete="off" placeholder="Nome do cliente"></label>
-      <label>Nº lulu<input name="luluId" autocomplete="off" placeholder="opcional" inputmode="numeric"></label>
+    <div class="row2">
+      <label class="f"><span>Cliente</span><input name="client" autocomplete="off"></label>
+      <label class="f"><span>Nº lulu</span><input name="luluId" autocomplete="off" placeholder="opcional" inputmode="numeric"></label>
     </div>
-    <div class="field-row three">
-      <label>Atividade<select name="type"></select></label>
-      <label>Qtd<input type="number" name="qty" min="1" max="50"></label>
-      <label>Pontos<input type="number" name="pts" min="0" step="0.25"></label>
+    <div class="row3">
+      <label class="f"><span>Atividade</span><select name="type"></select></label>
+      <label class="f"><span>Qtd</span><input type="number" name="qty" min="1" max="50"></label>
+      <label class="f"><span>Pontos</span><input type="number" name="pts" min="0" step="0.25"></label>
     </div>
-    <label id="actExtraRow">Descrição / observação<input name="desc" autocomplete="off" placeholder="ex.: ficou até tarde fechando campanha"></label>
+    <label class="f"><span>Observação</span><input name="desc" autocomplete="off" placeholder="opcional"></label>
     <div id="actAdmin" class="adm-box">
-      <label>Status<select name="status"><option value="pendente">Aguardando</option><option value="aprovada">Aprovada</option><option value="erro">Erro apontado</option><option value="recusada">Recusada</option></select></label>
-      <label>Comentário para o designer<input name="note" autocomplete="off" placeholder="ex.: pontuação acima do combinado"></label>
+      <label class="f"><span>Status</span><select name="status"><option value="pendente">Aguardando</option><option value="aprovada">Aprovada</option><option value="erro">Corrigir</option><option value="recusada">Recusada</option></select></label>
+      <label class="f"><span>Comentário para o designer</span><input name="note" autocomplete="off" placeholder="ex.: só 2 variações nesse envio"></label>
     </div>
     <p class="err" id="actErr" role="alert"></p>
-    <footer><button type="button" class="ghost danger" id="delAct">Excluir</button><span class="sp"></span><button type="button" class="ghost" data-close>Cancelar</button><button type="submit" class="solid">Salvar</button></footer>
+    <footer><button type="button" class="btn line danger" id="delAct">Excluir</button><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark">Salvar</button></footer>
   </form>
 </dialog>
 
 <!-- Designer -->
 <dialog id="personDlg">
   <form id="personForm" novalidate>
-    <header><span class="eyebrow" id="pEyebrow">novo designer</span><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
-    <input name="name" class="title-in" placeholder="Nome do designer" autocomplete="off">
-    <div class="reg-pick two">
+    <header><h2 id="pTitle">Novo designer</h2><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
+    <label class="f"><span>Nome</span><input name="name" autocomplete="off" placeholder="Nome do designer"></label>
+    <div class="reg-pick">
       <label><input type="radio" name="regime" value="CLT"><span><b>CLT</b><small>08–18 · almoço 12–13</small></span></label>
       <label><input type="radio" name="regime" value="PJ" checked><span><b>PJ</b><small>08–18 direto</small></span></label>
     </div>
-    <label>E-mail<input name="email" type="email" autocomplete="off" placeholder="nome@seubone.com"></label>
-    <div class="swatches" id="swatches"></div>
+    <label class="f"><span>E-mail</span><input name="email" type="email" autocomplete="off" placeholder="nome@seubone.com"></label>
+    <div class="f"><span>Cor</span><div class="swatches" id="swatches"></div></div>
     <label class="switch"><input type="checkbox" name="payByPoints" checked><i></i>recebe por pontos</label>
     <p class="err" id="personErr" role="alert"></p>
-    <footer><span class="sp"></span><button type="button" class="ghost" data-close>Cancelar</button><button type="submit" class="solid">Salvar</button></footer>
+    <footer><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark">Salvar</button></footer>
+  </form>
+</dialog>
+
+<!-- Horas online -->
+<dialog id="hoursDlg">
+  <form id="hoursForm" novalidate>
+    <header><h2 id="hTitle">Horas online</h2><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
+    <p class="dlg-hint"><span id="hSub"></span> · digite como 8:30 ou 8,5</p>
+    <div class="h-grid" id="hGrid"></div>
+    <footer><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark">Salvar horas</button></footer>
   </form>
 </dialog>
 
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <div id="toast" role="status"></div>
 
-<script src="js/store.js?v=1"></script>
-<script src="js/app.js?v=1"></script>
+<script src="js/store.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
 </body>
 </html>
