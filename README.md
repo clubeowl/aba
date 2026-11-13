@@ -6,31 +6,51 @@ Painel do time de design da SeuBoné. Os designers lançam o que fizeram no dia.
 
 ## Menus
 
-Admin e designers usam **as mesmas telas**. O admin só ganha o menu **Configurações** e os botões de conferência nas linhas.
+Admin e designers usam **as mesmas telas**. O admin só ganha o menu **Configurações** e os botões de conferência nos cards.
 
 | Menu | Quem vê | O que tem |
 |---|---|---|
-| **Atividades** | todos | Um resumo do período (pontos aprovados, o que está aguardando, horas online, bônus e quanto vai receber), uma linha para lançar atividades (o ponto já vem calculado pela tabela) e uma tabela por designer com o status de cada lançamento. O designer edita, exclui e corrige o que é dele. O admin também escolhe para qual designer está lançando, cria **atividade extra** com pontos livres, aprova (uma por uma ou todas de uma vez), pede correção com comentário, recusa, ajusta os pontos direto na célula e lança as **horas online** clicando no campo "Online" de cada designer. |
-| **Métricas** | todos | Gasto e valor a receber, pontos, clientes, horas, rankings, gráfico por dia, de onde vêm os pontos e a tabela de fechamento com exportação para o Excel. O designer não vê quanto os outros recebem. |
-| **Configurações** | só admin | Equipe (cadastro dos designers), Pontuação (tabela de pontos, valor do ponto e bônus), Horas online (grade da semana) e Dados (exportar, importar, exemplo, zerar e registro da gestão). |
+| **Atividades** | todos | Resumo do período (pontos aprovados, aguardando, horas online, Buff e a receber), o formulário **Lançar card** com o recibo de pontos calculado na hora, e a lista de cards de cada designer. O admin aprova, pede correção, recusa, edita, ajusta pontos e lança as horas online. |
+| **Ranking** | todos | Pódio da semana e do mês (o mês já conta o Buff) e a área **Buff** com a média de horas por dia de cada PJ e quanto falta para a próxima faixa. |
+| **Métricas** | todos | Gasto, pontos, horas, rankings (tempo online, cards, cards difíceis), gráfico por dia, pontos por tipo de atividade e a tabela de fechamento com exportação para o Excel. O designer não vê quanto os outros recebem. |
+| **Configurações** | só admin | Equipe, Pontuação (tipos, logo recebida, adicionais, dificuldade, valor do ponto e faixas do Buff), Horas online e Dados. |
 
-## Status de uma atividade
+## O card
 
-**Aguardando** (o designer lançou) → **Aprovada** (entra no valor), **Corrigir** (volta para o designer com o comentário, e ele corrige e reenvia) ou **Recusada** (não entra no valor).
+Designer · dia · hora · cliente · nome do card · nº do lulu · tipo de atividade · logo recebida · adicionais · dificuldade · tempo gasto · detalhes da pontuação · pontos · valor.
 
-## Regras que vêm configuradas (editáveis em Configurações → Pontuação)
+| Tipo de atividade | Pontos |
+|---|---|
+| Logo / layout | 1 |
+| Catálogo / PDF | 4 |
+| Atividade pequena | 6 |
+| Atividade média | 8 |
+| Atividade grande | 12 |
 
-| Atividade | Pontos | Regra |
-|---|---|---|
-| Logo | 1 | |
-| Variação livre | 0,5 | até 4 por cliente, só no 1º envio |
-| Variação pedida | 0,5 | |
-| Mudança na logo | 0,5 | |
-| Mudança no layout do boné | 0,5 | |
+| Logo recebida | Soma |
+|---|---|
+| Alta ou média qualidade | 0 |
+| Baixa qualidade | +1 |
+| Não tinha, teve que recriar | +1 |
+| Criou a logo do zero | +1 |
 
-**Valor a receber** = pontos aprovados × valor do ponto (R$ 3,00) × bônus.
+Adicionais (cada um): variação da logo +0,5 · mudança na logo +0,5 · mudança no layout +0,5.
 
-O bônus usa a média das horas online lançadas pela gestão, por dia trabalhado: a partir de 6h ×1,1, de 8h ×1,2 e de 10h ×1,3.
+Dificuldade (leve, moderado, difícil) não muda os pontos: vira a linha azul, amarela ou vermelha do card.
+
+**Status:** Aguardando → Aprovado (entra no valor), Corrigir (volta com comentário) ou Recusado.
+
+## Buff (só PJ)
+
+Média de horas online por dia **no mês, contando fins de semana**:
+
+| Média por dia | Buff nos pontos do mês |
+|---|---|
+| menos de 8h | sem buff |
+| de 8h a 12h | ×1,5 |
+| mais de 12h | ×2,0 |
+
+**A receber** = pontos aprovados × valor do ponto (R$ 3,00) × Buff.
 
 ## Publicar no GitHub Pages
 
