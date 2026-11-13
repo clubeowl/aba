@@ -1,6 +1,8 @@
 'use strict';
 /* =========================================================
-   Dedé — telas: Atividades · Equipe · Métricas
+   Dedé — telas
+   Todos veem as mesmas telas (Atividades e Métricas).
+   O admin ganha o menu Configurações e as ações de conferência.
    ========================================================= */
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -18,25 +20,23 @@ const fmtBRL = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BR
 const fmtDur = min => { min = Math.max(0, Math.round(min)); const h = Math.floor(min / 60), m = min % 60; return h ? `${h}h${pad(m)}` : `${m}min`; };
 const fmtMult = m => `×${fmtNum(m, Math.round(m * 100) % 10 ? 2 : 1)}`;
 const fmtDay = k => { const d = parseKey(k); return `${WD[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
-const parseHM = v => { v = String(v || '').trim().replace(',', '.'); if (!v) return 0; if (v.includes(':') || v.includes('h')) { const [h, m] = v.split(/[:h]/); return (+h || 0) * 60 + (+m || 0); } return Math.round(parseFloat(v) * 60) || 0; };
+const parseHM = v => { v = String(v || '').trim().replace(',', '.'); if (!v) return 0; if (/[:h]/.test(v)) { const [h, m] = v.split(/[:h]/); return (+h || 0) * 60 + (+m || 0); } return Math.round(parseFloat(v) * 60) || 0; };
 const toHM = min => min ? `${Math.floor(min / 60)}:${pad(Math.round(min % 60))}` : '';
+const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
 
 const STATUS = {
   pendente: { label: 'Aguardando', cls: 'st-pend' },
   aprovada: { label: 'Aprovada', cls: 'st-ok' },
-  erro: { label: 'Erro apontado', cls: 'st-err' },
+  erro: { label: 'Corrigir', cls: 'st-err' },
   recusada: { label: 'Recusada', cls: 'st-no' },
 };
 
 const ui = {
-  view: 'atividades',
+  view: 'atividades', cfg: 'equipe',
   meId: localStorage.getItem('dede.me') || 'adm',
-  period: 'dia',
-  day: new Date(),
-  who: 'all',
-  status: 'todas',
-  q: '',
-  closed: {},
+  period: 'dia', day: new Date(),
+  who: 'all', status: 'todas', q: '',
+  closed: {}, enter: true, flash: {}, limit: {},
 };
 const me = () => person(ui.meId) || S.people.find(p => p.role === 'admin');
 const isAdmin = () => me().role === 'admin';
@@ -44,8 +44,8 @@ const avatar = (p, size = '') => p ? `<span class="av ${size}" style="--pc:${p.c
 
 const I = {
   atividades: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
-  equipe: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   metricas: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>',
+  config: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -54,18 +54,25 @@ const I = {
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   sheet: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
-  star: '<path d="M12 2l2.9 6.26 6.6.74-4.9 4.6 1.3 6.6L12 17l-5.9 3.2 1.3-6.6L2.5 9l6.6-.74z"/>',
   left: '<path d="M15 18l-6-6 6-6"/>',
   right: '<path d="M9 18l6-6-6-6"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  star: '<path d="M12 2l2.9 6.26 6.6.74-4.9 4.6 1.3 6.6L12 17l-5.9 3.2 1.3-6.6L2.5 9l6.6-.74z"/>',
+  db: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.7-4 3-9 3s-9-1.3-9-3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>',
+  spark: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
 };
 const ico = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n] || ''}</svg>`;
+/* número que conta ao entrar na tela */
+const num = (v, kind = 'pts') => `<span class="count" data-count="${+v || 0}" data-kind="${kind}">${kind === 'brl' ? fmtBRL(+v || 0) : kind === 'dur' ? fmtDur(+v || 0) : kind === 'int' ? Math.round(v) : fmtPts(+v || 0)}</span>`;
 
 /* ---------- período ---------- */
 function period() {
   const d = startOfDay(ui.day);
-  if (ui.period === 'semana') { const a = startOfWeek(d), b = addDays(a, 6); return { from: dkey(a), to: dkey(b), label: `semana de ${a.getDate()} ${MES[a.getMonth()]} a ${b.getDate()} ${MES[b.getMonth()]}` }; }
-  if (ui.period === 'mes') { const a = new Date(d.getFullYear(), d.getMonth(), 1), b = new Date(d.getFullYear(), d.getMonth() + 1, 0); return { from: dkey(a), to: dkey(b), label: `${MESL[d.getMonth()]} de ${d.getFullYear()}` }; }
-  return { from: dkey(d), to: dkey(d), label: `${WDL[d.getDay()]}, ${d.getDate()} de ${MESL[d.getMonth()]}` };
+  if (ui.period === 'semana') { const a = startOfWeek(d), b = addDays(a, 6); return { from: dkey(a), to: dkey(b), label: `${a.getDate()} ${MES[a.getMonth()]} – ${b.getDate()} ${MES[b.getMonth()]}`, days: range(0, 7).map(i => addDays(a, i)) }; }
+  if (ui.period === 'mes') { const a = new Date(d.getFullYear(), d.getMonth(), 1), b = new Date(d.getFullYear(), d.getMonth() + 1, 0); return { from: dkey(a), to: dkey(b), label: `${MESL[d.getMonth()]} ${d.getFullYear()}`, days: range(0, b.getDate()).map(i => addDays(a, i)) }; }
+  return { from: dkey(d), to: dkey(d), label: `${WDL[d.getDay()]}, ${d.getDate()} de ${MESL[d.getMonth()]}`, days: [d] };
 }
 function shiftPeriod(n) {
   if (!n) { ui.day = new Date(); return; }
@@ -73,133 +80,142 @@ function shiftPeriod(n) {
   else if (ui.period === 'mes') ui.day = new Date(ui.day.getFullYear(), ui.day.getMonth() + n, 1);
   else ui.day = addDays(ui.day, n);
 }
+const seg = (name, opts, cur) => `<div class="seg" data-seg="${name}">${opts.map(([v, l, extra]) => `<button data-${name}="${v}" class="${cur === v ? 'on' : ''}">${l}${extra != null ? `<b>${extra}</b>` : ''}</button>`).join('')}<i class="thumb"></i></div>`;
 const periodCtl = () => `<div class="period-ctl">
-  <div class="seg">${[['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']].map(([v, l]) => `<button data-period="${v}" class="${ui.period === v ? 'on' : ''}">${l}</button>`).join('')}</div>
-  <button class="icon" data-shift="-1" aria-label="anterior">${ico('left')}</button>
-  <button class="ghost sm" data-shift="0">hoje</button>
-  <button class="icon" data-shift="1" aria-label="próximo">${ico('right')}</button>
+  ${seg('period', [['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']], ui.period)}
+  <div class="stepper"><button class="icon-btn" data-shift="-1" aria-label="anterior">${ico('left')}</button><button class="today-btn" data-shift="0">Hoje</button><button class="icon-btn" data-shift="1" aria-label="próximo">${ico('right')}</button></div>
 </div>`;
 
 /* ---------- shell ---------- */
+const MENU = [['atividades', 'Atividades'], ['metricas', 'Métricas'], ['config', 'Configurações']];
 function render() {
   if (!person(ui.meId)) ui.meId = me().id;
-  const items = [['atividades', 'Atividades']];
-  if (isAdmin()) items.push(['equipe', 'Equipe'], ['metricas', 'Métricas']);
+  const items = MENU.filter(([v]) => v !== 'config' || isAdmin());
   if (!items.some(i => i[0] === ui.view)) ui.view = 'atividades';
-  const pend = S.activities.filter(a => a.status === 'pendente').length;
-  $('#nav').innerHTML = items.map(([v, l]) => `<button data-view="${v}" class="${ui.view === v ? 'on' : ''}" aria-label="${l}">${ico(v)}${v === 'atividades' && isAdmin() && pend ? `<i class="nav-badge">${pend > 99 ? '99+' : pend}</i>` : ''}<span class="lbl">${l}</span></button>`).join('');
-  const sub = ui.view === 'equipe' ? `${designers().length} designer${designers().length === 1 ? '' : 's'}` : period().label;
-  $('#title').innerHTML = `<span>${Object.fromEntries(items)[ui.view]}</span><i class="sep"></i><span class="sub">${esc(sub)}</span>`;
+  const pend = S.activities.filter(a => a.status === 'pendente' && (isAdmin() || a.designerId === me().id)).length;
+  $('#nav').innerHTML = items.map(([v, l]) => `<button data-view="${v}" class="${ui.view === v ? 'on' : ''}" aria-label="${l}">${ico(v)}<span class="lbl">${l}</span>${v === 'atividades' && pend ? `<i class="nav-badge">${pend > 99 ? '99+' : pend}</i>` : ''}</button>`).join('') + '<i class="rail-ind"></i>';
+  const titles = { atividades: 'Atividades', metricas: 'Métricas', config: 'Configurações' };
+  const sub = ui.view === 'config' ? 'só a gestão vê' : period().label;
+  $('#title').innerHTML = `<h1>${titles[ui.view]}</h1><span>${esc(sub)}</span>`;
+  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : periodCtl();
   renderMe();
-  document.body.dataset.view = ui.view;
-  $('#main').innerHTML = ({ atividades: viewAtividades, equipe: viewEquipe, metricas: viewMetricas })[ui.view]();
+  const html = ({ atividades: viewAtividades, metricas: viewMetricas, config: viewConfig })[ui.view]();
+  const main = $('#main');
+  main.innerHTML = html;
+  main.classList.toggle('enter', ui.enter);
+  after();
+}
+const lastPos = {};
+function slide(el, key, x, w, prop) {
+  // começa onde estava e anima até a nova posição
+  const prev = lastPos[key];
+  const set = (xx, ww) => { if (prop === 'y') { el.style.transform = `translateY(${xx}px)`; el.style.height = ww + 'px'; } else { el.style.transform = `translateX(${xx}px)`; el.style.width = ww + 'px'; } };
+  if (prev && (prev.x !== x || prev.w !== w)) { el.style.transition = 'none'; set(prev.x, prev.w); el.getBoundingClientRect(); el.style.transition = ''; }
+  requestAnimationFrame(() => set(x, w));
+  if (!prev) set(x, w);
+  el.style.opacity = 1;
+  lastPos[key] = { x, w };
+}
+function after() {
+  const on = $('#nav button.on'), ind = $('.rail-ind');
+  if (on && ind) slide(ind, 'nav', on.offsetTop, on.offsetHeight, 'y');
+  $$('.seg').forEach(sg => { const b = sg.querySelector('button.on'), t = sg.querySelector('.thumb'); if (b && t) slide(t, 'seg-' + sg.dataset.seg, b.offsetLeft - 4, b.offsetWidth, 'x'); else if (t) t.style.opacity = 0; });
+  if (ui.enter) countUp();
+  ui.enter = false; ui.flash = {};
 }
 function renderMe() {
   const m = me();
-  const opts = `<optgroup label="Admin">${S.people.filter(p => p.role === 'admin').map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</optgroup>` +
-    (designers().length ? `<optgroup label="Designers">${designers().map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)} · ${p.regime}</option>`).join('')}</optgroup>` : '');
-  $('#me').innerHTML = `<span class="role-tag ${isAdmin() ? 'adm' : ''}">${isAdmin() ? 'admin' : 'designer'}</span><label class="whoami" title="Modo demonstração: troque de usuário para ver como cada um enxerga">${avatar(m, 'sm')}<select id="meSel" aria-label="Entrar como">${opts}</select></label>`;
+  const opts = `<optgroup label="Gestão">${S.people.filter(p => p.role === 'admin').map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</optgroup>` +
+    (designers().length ? `<optgroup label="Designers">${designers().map(p => `<option value="${p.id}" ${p.id === m.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</optgroup>` : '');
+  $('#me').innerHTML = `<label class="who" title="Modo demonstração: troque de usuário para ver como cada um enxerga">${avatar(m, 'sm')}<span class="who-t"><b>${esc(firstName(m.name))}</b><small>${isAdmin() ? 'admin' : m.regime}</small></span>${ico('chev')}<select id="meSel" aria-label="Entrar como">${opts}</select></label>`;
 }
+function countUp() {
+  $$('.count').forEach((el, i) => {
+    const to = +el.dataset.count, kind = el.dataset.kind;
+    if (!to) return;
+    const f = kind === 'brl' ? fmtBRL : kind === 'dur' ? fmtDur : kind === 'int' ? (v => String(Math.round(v))) : fmtPts;
+    const t0 = performance.now() + i * 40, dur = 700;
+    const step = t => { const p = Math.min(1, Math.max(0, (t - t0) / dur)), e = 1 - Math.pow(1 - p, 3); el.textContent = f(kind === 'int' ? Math.round(to * e) : kind === 'pts' ? Math.round(to * e * 2) / 2 : to * e); if (p < 1) requestAnimationFrame(step); else el.textContent = f(to); };
+    requestAnimationFrame(step);
+  });
+}
+function go(view) { ui.view = view; ui.enter = true; render(); scrollTo({ top: 0, behavior: 'smooth' }); }
 
 /* ============================================================
-   ATIVIDADES
+   ATIVIDADES (igual para todos)
    ============================================================ */
+const visiblePeople = () => isAdmin() ? (ui.who === 'all' ? designers() : [person(ui.who)].filter(Boolean)) : [me()];
+
 function viewAtividades() {
-  const admin = isAdmin(), m = me();
-  if (admin && !designers().length) return welcome();
+  if (!designers().length) return welcome();
   const { from, to } = period();
-  const ppl = admin ? (ui.who === 'all' ? designers() : [person(ui.who)].filter(Boolean)) : [m];
+  const ppl = visiblePeople();
   const pool = S.activities.filter(a => inRange(a.date, from, to) && ppl.some(p => p.id === a.designerId));
-  const countBy = st => st === 'todas' ? pool.length : pool.filter(a => a.status === st).length;
-  const tabs = [['todas', 'Todas'], ['pendente', 'Aguardando'], ['aprovada', 'Aprovadas'], ['erro', 'Com erro'], ['recusada', 'Recusadas']];
-
-  const head = `<div class="page-head">
-    <button class="solid big" data-new>${ico('plus')}${admin ? 'Atividade extra' : 'Nova atividade'}</button><span class="vsep"></span>
-    ${periodCtl()}
-    <span class="sp"></span>
-    <div class="tab-row">${tabs.map(([v, l]) => `<button class="tab-pill ${ui.status === v ? 'on' : ''} ${v === 'pendente' && countBy(v) ? 'warn' : ''}" data-status="${v}"><span>${l}</span><b>${countBy(v)}</b></button>`).join('')}</div>
-  </div>`;
-
-  const top = admin ? onlinePanel() : mySummary(m) + quickAdd(m);
-
-  const toolbar = `<div class="sheet-toolbar">
-    <h2>${admin ? 'Atividades do time' : 'Suas atividades'}</h2><span class="sp"></span>
-    ${admin ? `<select class="pill-select" data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>` : ''}
-    <input class="search" type="search" placeholder="buscar cliente, nº lulu, atividade…" value="${esc(ui.q)}" data-q>
-  </div>`;
-
-  return `<section class="page">${head}${top}${toolbar}${ppl.map(p => activityBlock(p, from, to)).join('')}</section>`;
+  const cnt = st => st === 'todas' ? pool.length : pool.filter(a => a.status === st).length;
+  return `<section class="page">
+    ${summary(ppl, from, to)}
+    ${quickAdd()}
+    <div class="filters">
+      ${seg('status', [['todas', 'Todas', cnt('todas')], ['pendente', 'Aguardando', cnt('pendente')], ['aprovada', 'Aprovadas', cnt('aprovada')], ['erro', 'Corrigir', cnt('erro')], ['recusada', 'Recusadas', cnt('recusada')]], ui.status)}
+      <span class="sp"></span>
+      ${isAdmin() ? `<label class="select-pill">${ico('users')}<select data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${ico('chev')}</label>` : ''}
+      <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, nº lulu…" value="${esc(ui.q)}" data-q></label>
+    </div>
+    ${ppl.map((p, i) => block(p, from, to, i)).join('')}
+  </section>`;
 }
 
 function welcome() {
+  const admin = isAdmin();
   return `<section class="page"><div class="welcome">
     <img src="img/seubone-logo-branco.png" alt="SeuBoné" class="w-logo">
     <h2>Bem-vindo ao <b>Dedé</b></h2>
-    <p>Aqui os designers lançam o que fizeram no dia, você confere, aprova e acompanha os pontos, as horas online e quanto cada um tem a receber.</p>
-    <div class="w-steps">
-      <div><b>1</b><span>Cadastre os designers</span></div>
-      <div><b>2</b><span>Confira a tabela de pontos e o valor do ponto</span></div>
-      <div><b>3</b><span>Os designers entram e lançam as atividades</span></div>
-    </div>
-    <div class="btns"><button class="solid big light-solid" data-add-person>${ico('plus')}Cadastrar primeiro designer</button><button class="ghost light" data-io="demo">ver com dados de exemplo</button></div>
+    <p>Os designers lançam o que fizeram, a gestão confere e todo mundo acompanha pontos, horas online e quanto vai receber.</p>
+    <div class="w-steps"><div><b>1</b>Cadastre os designers</div><div><b>2</b>Confira a tabela de pontos</div><div><b>3</b>O time começa a lançar</div></div>
+    ${admin ? `<div class="btns"><button class="btn brand big" data-add-person>${ico('plus')}Cadastrar primeiro designer</button><button class="btn glass" data-io="demo">Ver com dados de exemplo</button></div>` : ''}
   </div></section>`;
 }
 
-function mySummary(p) {
-  const { from, to, label } = period();
-  const s = stats(p.id, from, to);
-  return `<div class="my-sum" style="--pc:${p.color}">
-    <div class="ms-main"><span>${esc(label)}</span><b>${fmtPts(s.points)}</b><small>pontos aprovados</small></div>
-    <div><span>aguardando</span><b>${fmtPts(s.pendingPts)}</b><small>${s.pending} atividade${s.pending === 1 ? '' : 's'}</small></div>
-    <div><span>tempo online</span><b>${fmtDur(s.minutes)}</b><small>lançado pela gestão</small></div>
-    <div><span>bônus</span><b>${fmtMult(s.mult)}</b><small>${fmtNum(s.avgH)}h por dia</small></div>
-    <div class="ms-pay"><span>a receber</span><b>${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</b><small>só o que foi aprovado</small></div>
+function summary(ppl, from, to) {
+  const admin = isAdmin();
+  const st = ppl.map(p => stats(p.id, from, to));
+  const t = st.reduce((a, s) => ({ pts: a.pts + s.points, pend: a.pend + s.pending, pendPts: a.pendPts + s.pendingPts, min: a.min + s.minutes, pay: a.pay + (s.pay || 0), cl: a.cl + s.clients }), { pts: 0, pend: 0, pendPts: 0, min: 0, pay: 0, cl: 0 });
+  const one = ppl.length === 1 ? st[0] : null;
+  const who = admin ? (ppl.length === 1 ? firstName(ppl[0].name) : 'Time') : 'Você';
+  return `<div class="summary">
+    <div class="sm-main"><span>${who} · pontos aprovados</span><b>${num(t.pts)}</b><small>${plural(t.cl, 'cliente atendido', 'clientes atendidos')}</small></div>
+    <div><span>Aguardando aprovação</span><b>${num(t.pendPts)}</b><small>${plural(t.pend, 'atividade', 'atividades')}</small></div>
+    <div><span>Tempo online</span><b>${num(t.min, 'dur')}</b><small>${one ? `${fmtNum(one.avgH)}h por dia` : 'soma do time'}</small></div>
+    <div><span>Bônus</span><b>${one ? fmtMult(one.mult) : '—'}</b><small>${one ? 'pela média de horas' : 'varia por pessoa'}</small></div>
+    <div class="sm-pay"><span>${admin && ppl.length > 1 ? 'A pagar' : 'A receber'}</span><b>${num(t.pay, 'brl')}</b><small>só o que foi aprovado</small></div>
   </div>`;
 }
 
-/* linha de lançamento rápido, estilo planilha */
-function quickAdd(p) {
-  const now = new Date(), k = dkey(ui.period === 'dia' ? ui.day : now);
-  const t = S.settings.itemTypes[0];
+/* lançamento rápido: igual para todos; admin escolhe o designer e pode lançar extra */
+function quickAdd() {
+  const admin = isAdmin(), now = new Date(), k = dkey(ui.period === 'dia' ? ui.day : now);
+  const who = admin ? (ui.who !== 'all' ? ui.who : (designers()[0] || {}).id) : me().id;
+  const clients = [...new Set(S.activities.filter(a => a.designerId === who && a.client).slice(-80).map(a => a.client))];
   return `<form class="quick" id="quickForm" autocomplete="off">
-    <div class="q-title">${ico('plus')}<b>Lançar atividade</b><span>preencha e aperte Enter</span></div>
-    <div class="q-row">
-      <label class="q-date">Data<input type="date" name="date" value="${k}" max="${dkey(now)}"></label>
-      <label class="q-time">Hora<input type="time" name="time" value="${hm(now)}"></label>
-      <label class="q-client">Cliente<input name="client" placeholder="Nome do cliente" required list="clientList"></label>
-      <label class="q-lulu">Nº lulu<input name="luluId" placeholder="opcional" inputmode="numeric"></label>
-      <label class="q-type">Atividade<select name="type">${S.settings.itemTypes.map(x => `<option value="${x.id}">${esc(x.label)} · ${fmtPts(x.pts)} pt</option>`).join('')}</select></label>
-      <label class="q-qty">Qtd<input type="number" name="qty" min="1" max="50" value="1"></label>
-      <div class="q-pts"><span>Pontos</span><b id="qPts">${fmtPts(t.pts)}</b></div>
-      <button class="solid" type="submit">${ico('plus')}Adicionar</button>
+    <div class="q-head"><span class="q-ico">${ico('plus')}</span><b>Lançar atividade</b><span class="q-tip">preencha e aperte <kbd>Enter</kbd></span></div>
+    <div class="q-row ${admin ? 'adm' : ''}">
+      ${admin ? `<label class="f q-who"><span>Designer</span><select name="designerId">${designers().map(p => `<option value="${p.id}" ${p.id === who ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
+      <label class="f q-date"><span>Data</span><input type="date" name="date" value="${k}"></label>
+      <label class="f q-time"><span>Hora</span><input type="time" name="time" value="${hm(now)}"></label>
+      <label class="f q-client"><span>Cliente</span><input name="client" placeholder="Nome do cliente" list="clientList"></label>
+      <label class="f q-lulu"><span>Nº lulu</span><input name="luluId" placeholder="opcional" inputmode="numeric"></label>
+      <label class="f q-type"><span>Atividade</span><select name="type">${S.settings.itemTypes.map(x => `<option value="${x.id}">${esc(x.label)} · ${fmtPts(x.pts)} pt</option>`).join('')}${admin ? '<option value="extra">Extra · pontos livres</option>' : ''}</select></label>
+      <label class="f q-qty"><span>Qtd</span><input type="number" name="qty" min="1" max="50" value="1"></label>
+      <label class="f q-pts"><span>Pontos</span><input name="pts" value="${fmtPts(S.settings.itemTypes[0]?.pts || 0)}" ${admin ? '' : 'readonly tabindex="-1"'} inputmode="decimal"></label>
+      <button class="btn dark q-go" type="submit">${ico('plus')}<span>Adicionar</span></button>
     </div>
-    <datalist id="clientList">${[...new Set(S.activities.filter(a => a.designerId === p.id && a.client).slice(-60).map(a => a.client))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <datalist id="clientList">${clients.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <p class="q-warn" id="qWarn"></p>
   </form>`;
 }
 
-/* horas online lançadas pelo admin */
-function onlinePanel() {
-  const ds = designers();
-  if (ui.period === 'mes') return `<div class="card hint-card">${ico('clock')}<span>Para lançar as horas online, mude para <b>Dia</b> ou <b>Semana</b>.</span></div>`;
-  const days = ui.period === 'semana' ? range(0, 7).map(i => addDays(startOfWeek(ui.day), i)) : [startOfDay(ui.day)];
-  const today = dkey(new Date());
-  return `<div class="card online-card">
-    <div class="card-head"><h3>${ico('clock')} Horas online</h3><span>quanto tempo cada designer ficou online · digite como 8:30 ou 8,5</span></div>
-    <div class="table-wrap"><table class="hours-grid">
-      <thead><tr><th>Designer</th>${days.map(d => `<th class="${dkey(d) === today ? 'today' : ''} ${isWeekendDate(d) ? 'we' : ''}">${WD[d.getDay()]} ${d.getDate()}</th>`).join('')}${days.length > 1 ? '<th>Total</th>' : ''}</tr></thead>
-      <tbody>${ds.map(p => {
-        const tot = days.reduce((s, d) => s + onlineMin(p.id, dkey(d)), 0);
-        return `<tr><td class="hg-who">${avatar(p, 'sm')}<span>${esc(p.name)}</span><small>${p.regime}</small></td>
-          ${days.map(d => { const k = dkey(d), v = onlineMin(p.id, k); return `<td class="${isWeekendDate(d) ? 'we' : ''}"><input class="hm-in ${v ? 'has' : ''}" data-online="${p.id}|${k}" value="${toHM(v)}" placeholder="—" inputmode="decimal"></td>`; }).join('')}
-          ${days.length > 1 ? `<td class="hg-tot">${fmtDur(tot)}</td>` : ''}</tr>`;
-      }).join('')}</tbody>
-    </table></div>
-  </div>`;
-}
-
-function activityBlock(p, from, to) {
-  const admin = isAdmin();
+function block(p, from, to, idx) {
+  const admin = isAdmin(), m = me();
   const s = stats(p.id, from, to);
   const rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
   let rows = s.acts.slice();
@@ -208,172 +224,110 @@ function activityBlock(p, from, to) {
   rows.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const closed = ui.closed[p.id];
   const pendN = s.acts.filter(a => a.status === 'pendente').length;
-  let lastDay = '', n = 0;
-  const body = rows.map(a => {
-    const t = typeOf(a.type), st = STATUS[a.status], warn = a.status !== 'recusada' && !a.extra ? ruleWarnings(a) : '';
+  let lastDay = '';
+  const lim = ui.limit[p.id] || 25, rest = rows.length - lim;
+  const body = rows.slice(0, lim).map((a, i) => {
+    const t = typeOf(a.type), st = STATUS[a.status];
+    const warn = a.status !== 'recusada' && !a.extra ? ruleWarnings(a) : '';
     const sug = a.extra ? null : suggestedPts(a.type, a.qty);
     const adjusted = sug != null && Math.abs(sug - a.pts) > 0.001;
     const newDay = a.date !== lastDay; lastDay = a.date;
-    const mine = a.designerId === me().id;
-    const canEdit = admin || (mine && a.status !== 'aprovada' && a.status !== 'recusada');
-    const val = rate == null ? null : a.pts * rate;
+    const mine = a.designerId === m.id;
+    const canEdit = mine && (a.status === 'pendente' || a.status === 'erro');
     let actions = '';
     if (admin) {
-      actions = `${a.status !== 'aprovada' ? `<button class="act-btn ok" data-approve="${a.id}" title="Aprovar">${ico('check')}</button>` : ''}
-        ${a.status !== 'erro' ? `<button class="act-btn err" data-mark="${a.id}|erro" title="Apontar erro">${ico('alert')}</button>` : ''}
-        ${a.status !== 'recusada' ? `<button class="act-btn no" data-mark="${a.id}|recusada" title="Recusar">${ico('x')}</button>` : ''}
-        <button class="act-btn" data-edit-act="${a.id}" title="Editar">${ico('edit')}</button>`;
+      actions = `<span class="ab-more">
+        ${a.status !== 'erro' ? `<button class="ab warn" data-mark="${a.id}|erro" data-tip="Pedir correção">${ico('alert')}</button>` : ''}
+        ${a.status !== 'recusada' ? `<button class="ab no" data-mark="${a.id}|recusada" data-tip="Recusar">${ico('x')}</button>` : ''}
+        <button class="ab" data-edit-act="${a.id}" data-tip="Editar">${ico('edit')}</button></span>${a.status !== 'aprovada' ? `<button class="ab ok" data-approve="${a.id}" data-tip="Aprovar">${ico('check')}</button>` : '<span class="ab-gap"></span>'}`;
     } else if (canEdit) {
-      actions = `<button class="act-btn" data-edit-act="${a.id}" title="${a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar'}">${ico('edit')}</button><button class="act-btn no" data-del-act="${a.id}" title="Excluir">${ico('trash')}</button>`;
+      actions = `<span class="ab-more show"><button class="ab" data-edit-act="${a.id}" data-tip="${a.status === 'erro' ? 'Corrigir' : 'Editar'}">${ico('edit')}</button><button class="ab no" data-del-act="${a.id}" data-tip="Excluir">${ico('trash')}</button></span>`;
     }
-    return `<tr class="${newDay ? 'newday' : ''} row-${a.status}">
-      <td class="rn">${++n}</td>
-      <td class="c-date">${fmtDay(a.date)}</td>
-      <td class="c-time">${esc(a.time || '')}</td>
-      <td class="c-client"><b>${esc(a.client || '—')}</b><small>${a.luluId ? `lulu #${esc(a.luluId)}` : a.extra ? 'criada pela gestão' : 'sem nº lulu'}${a.desc && a.desc !== a.client ? ' · ' + esc(a.desc) : ''}</small></td>
-      <td class="c-act"><span class="act" style="--tc:${t.color}"><i></i>${a.extra ? 'Extra' : esc(t.label)}</span>${a.qty > 1 ? `<em>×${a.qty}</em>` : ''}${warn ? `<span class="rule-warn" title="${esc(warn)}">${ico('alert')}</span>` : ''}</td>
-      <td class="num c-pts">${admin ? `<input class="pts-in ${adjusted ? 'adj' : ''}" type="number" step="0.25" min="0" value="${a.pts}" data-pts="${a.id}" title="${adjusted ? `sugerido: ${fmtPts(sug)}` : 'pontuação'}">` : `${fmtPts(a.pts)}${adjusted ? `<small class="adj-note">era ${fmtPts(sug)}</small>` : ''}`}</td>
-      <td class="num money ${a.status === 'aprovada' ? '' : 'faded'}">${val == null ? '—' : fmtBRL(val)}</td>
+    const flash = ui.flash[a.id] ? `flash-${ui.flash[a.id]}` : '';
+    return `<tr class="${newDay ? 'newday' : ''} r-${a.status} ${flash}" style="--i:${Math.min(i, 14)}">
+      <td class="c-date"><b>${fmtDay(a.date)}</b><small>${esc(a.time || '')}</small></td>
+      <td class="c-client"><b>${esc(a.client || '—')}</b><small>${a.luluId ? `lulu #${esc(a.luluId)}` : a.extra ? 'lançada pela gestão' : 'sem nº lulu'}${a.desc && a.desc !== a.client ? ' · ' + esc(a.desc) : ''}</small></td>
+      <td class="c-act"><span class="tag" style="--tc:${t.color}"><i></i>${a.extra ? 'Extra' : esc(t.label)}${a.qty > 1 ? `<em>×${a.qty}</em>` : ''}</span>${warn ? `<span class="rule-warn" data-tip="${esc(warn)}">${ico('alert')}</span>` : ''}</td>
+      <td class="num c-pts">${admin ? `<input class="pts-in ${adjusted ? 'adj' : ''}" type="number" step="0.25" min="0" value="${a.pts}" data-pts="${a.id}" title="${adjusted ? `pela tabela: ${fmtPts(sug)}` : 'clique para ajustar'}">` : `<b>${fmtPts(a.pts)}</b>${adjusted ? `<small class="adj-note">tabela: ${fmtPts(sug)}</small>` : ''}`}</td>
+      <td class="num money ${a.status === 'aprovada' ? '' : 'faded'}">${rate == null ? '—' : fmtBRL(a.pts * rate)}</td>
       <td class="c-status"><span class="st ${st.cls}">${st.label}</span>${a.note ? `<small class="st-note">${esc(a.note)}</small>` : ''}</td>
       <td class="c-actions">${actions}</td>
     </tr>`;
   }).join('');
   const okPts = rows.filter(a => a.status === 'aprovada').reduce((x, a) => x + a.pts, 0);
-  return `<section class="sheet-block" style="--pc:${p.color}">
-    <header class="sb-head" data-toggle="${p.id}">
-      ${avatar(p)}
-      <div class="sb-name"><b>${esc(p.name)}</b><span>${p.regime}${p.email ? ' · ' + esc(p.email) : ''}</span></div>
-      <div class="sb-stats">
-        <span><small>clientes</small><b>${s.clients}</b></span>
-        <span><small>aprovados</small><b>${fmtPts(s.points)} pts</b></span>
-        <span class="${pendN ? 'warn' : ''}"><small>aguardando</small><b>${pendN}</b></span>
-        <span><small>online</small><b>${fmtDur(s.minutes)}</b></span>
-        <span><small>bônus</small><b>${fmtMult(s.mult)}</b></span>
-        <span class="sb-pay"><small>a receber</small><b>${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</b></span>
+  const one = visiblePeople().length === 1;
+  return `<section class="block ${closed ? 'closed' : ''}" style="--pc:${p.color};--i:${idx}">
+    <header class="b-head" data-toggle="${p.id}">
+      ${avatar(p, 'md')}
+      <div class="b-name"><b>${esc(p.name)}</b><span>${p.regime}${p.email ? ' · ' + esc(p.email) : ''}</span></div>
+      <div class="b-chips">
+        <span class="chip"><small>Clientes</small><b>${s.clients}</b></span>
+        <span class="chip"><small>Aprovados</small><b>${fmtPts(s.points)}</b></span>
+        ${pendN ? `<span class="chip warn"><small>Aguardando</small><b>${pendN}</b></span>` : ''}
+        <${admin ? 'button' : 'span'} class="chip ${admin ? 'edit' : ''}" ${admin ? `data-hours="${p.id}" data-tip="Lançar horas online"` : ''}><small>Online</small><b>${fmtDur(s.minutes)}</b>${admin ? ico('clock', 'mini') : ''}</${admin ? 'button' : 'span'}>
+        <span class="chip"><small>Bônus</small><b>${fmtMult(s.mult)}</b></span>
+        <span class="chip dark"><small>A receber</small><b>${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</b></span>
       </div>
-      ${admin && pendN ? `<button class="solid sm approve-all" data-approve-all="${p.id}">${ico('check')}Aprovar ${pendN}</button>` : ''}
-      <span class="sb-chev ${closed ? '' : 'open'}">⌄</span>
+      ${admin && pendN ? `<button class="btn ok sm" data-approve-all="${p.id}">${ico('check')}Aprovar ${pendN}</button>` : ''}
+      ${one ? '' : `<span class="b-chev">${ico('chev')}</span>`}
     </header>
-    ${closed ? '' : `<div class="sheet-wrap"><table class="sheet acts">
-      <thead><tr><th class="rn">#</th><th>Data</th><th>Hora</th><th>Cliente</th><th>Atividade</th><th class="num">Pontos</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead>
-      <tbody>${body || `<tr><td colspan="9" class="empty-row">${admin ? 'Nenhuma atividade' : 'Você ainda não lançou nada'} ${ui.status !== 'todas' ? 'com esse status ' : ''}neste período.</td></tr>`}</tbody>
-      ${rows.length ? `<tfoot><tr><td></td><td colspan="4">${rows.length} atividade${rows.length === 1 ? '' : 's'} · aprovadas somam ${fmtPts(okPts)} pts${rate != null ? ` · ponto a ${fmtBRL(rate)} (${fmtBRL(S.settings.pointValue)} × ${fmtNum(s.mult, 2)})` : ''}</td><td class="num">${fmtPts(okPts)}</td><td class="num money">${rate == null ? '—' : fmtBRL(okPts * rate)}</td><td colspan="2"></td></tr></tfoot>` : ''}
-    </table></div>`}
+    <div class="b-body"><div class="b-inner">
+      <div class="table-wrap"><table class="grid">
+        <thead><tr><th>Data</th><th>Cliente</th><th>Atividade</th><th class="num">Pontos</th><th class="num">Valor</th><th>Status</th><th></th></tr></thead>
+        <tbody>${body || `<tr class="empty"><td colspan="7"><div>${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nada com esse filtro.' : mineEmpty(p)}</span></div></td></tr>`}</tbody>
+        ${rows.length ? `<tfoot><tr><td colspan="3">${plural(rows.length, 'atividade', 'atividades')}${rate != null ? ` · ponto a ${fmtBRL(rate)}` : ''}</td><td class="num">${fmtPts(okPts)}</td><td class="num money">${rate == null ? '—' : fmtBRL(okPts * rate)}</td><td colspan="2"></td></tr></tfoot>` : ''}
+      </table></div>
+      ${rest > 0 ? `<div class="more"><button class="btn line sm" data-more="${p.id}">Mostrar mais ${Math.min(50, rest)} <span class="muted">de ${rest}</span></button></div>` : ''}
+    </div></div>
   </section>`;
 }
+const mineEmpty = p => p.id === me().id ? 'Nada lançado ainda. Use a linha acima para começar.' : 'Nenhuma atividade neste período.';
 
 /* ============================================================
-   EQUIPE (admin)
-   ============================================================ */
-function viewEquipe() {
-  const st = S.settings;
-  const ppl = designers().map(p => `<article class="person" style="--pc:${p.color}">
-      ${avatar(p, 'xl')}
-      <div class="p-info">
-        <span class="reg ${p.regime}">${p.regime}</span>
-        <h3>${esc(p.name)}</h3>
-        <p>${p.email ? esc(p.email) : 'sem e-mail'}</p>
-        <label class="switch sm"><input type="checkbox" data-pay="${p.id}" ${p.payByPoints ? 'checked' : ''}><i></i>recebe por pontos</label>
-        <div class="p-act"><button class="ghost sm" data-edit-person="${p.id}">editar</button><button class="ghost sm danger" data-del-person="${p.id}">remover</button></div>
-      </div>
-    </article>`).join('');
-
-  const rows = st.itemTypes.map(t => `<li class="menu-row" style="--tc:${t.color}">
-    <span class="mr-dot"></span>
-    <div class="mr-main">
-      <input class="mr-label" data-tf="${t.id}|label" value="${esc(t.label)}">
-      <input class="mr-hint" data-tf="${t.id}|hint" value="${esc(t.hint || '')}" placeholder="descrição">
-      <div class="mr-rules"><label>limite por cliente <input type="number" min="0" step="1" data-tf="${t.id}|max" value="${t.max || ''}" placeholder="∞"></label>
-        <label class="clr"><input type="color" data-tf="${t.id}|color" value="${t.color}"></label>
-        ${t.id === 'logo' ? '' : `<button class="ghost sm danger" data-del-type="${t.id}">remover</button>`}</div>
-    </div>
-    <div class="mr-pts"><input type="number" min="0" step="0.25" data-tf="${t.id}|pts" value="${t.pts}"><span>pt</span></div>
-  </li>`).join('');
-  const tiers = [...st.tiers].sort((a, b) => a.h - b.h).map((t, i, arr) => `<div class="tier" style="--lvl:${i}">
-    <label>a partir de<input type="number" min="0" step="0.5" data-tier="${i}|h" value="${t.h}">h/dia</label>
-    <label class="tm">×<input type="number" min="0" step="0.05" data-tier="${i}|mult" value="${t.mult}"></label>
-    ${arr.length > 1 ? `<button class="x sm" data-del-tier="${i}" aria-label="remover faixa">×</button>` : ''}
-  </div>`).join('');
-
-  return `<section class="page">
-    <div class="page-head"><button class="solid big" data-add-person>${ico('plus')}Novo designer</button><span class="vsep"></span><span class="pill-note">Tudo aqui é editável e vale na hora</span></div>
-    <div class="team">${ppl || '<div class="empty-state"><p>Nenhum designer cadastrado ainda.</p></div>'}</div>
-    <div class="grid-pts">
-      <div class="card menu">
-        <div class="card-head"><h3>Tabela de pontos</h3><span>o designer escolhe a atividade e o ponto já vem calculado</span></div>
-        <ul class="menu-list">${rows}</ul>
-        <button class="ghost sm add-type" data-add-type>${ico('plus')}novo tipo de atividade</button>
-      </div>
-      <div class="col">
-        <div class="card ink-card">
-          <div class="card-head"><h3>Valor do ponto</h3><span>antes do bônus</span></div>
-          <div class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"><small>por ponto</small></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>Bônus por horas online</h3><span>média de horas por dia trabalhado</span></div>
-          <div class="tiers">${tiers}</div>
-          <button class="ghost sm" data-add-tier>${ico('plus')}faixa</button>
-          <p class="muted small">Valor a receber = pontos aprovados × ${fmtBRL(st.pointValue)} × bônus.</p>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>Dados</h3><span>modo demonstração · salvos neste navegador</span></div>
-          <div class="btns"><button class="ghost sm" data-io="export">exportar .json</button><button class="ghost sm" data-io="import">importar</button><button class="ghost sm" data-io="demo">carregar exemplo</button><button class="ghost sm danger" data-io="reset">zerar tudo</button></div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-head"><h3>Registro da gestão</h3><span>últimas ações</span></div>
-      <ul class="log">${S.log.slice(0, 12).map(l => { const d = new Date(l.at); return `<li><span>${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${hm(d)}</span>${esc(l.text)}</li>`; }).join('') || '<li class="muted">nada ainda</li>'}</ul>
-    </div>
-  </section>`;
-}
-
-/* ============================================================
-   MÉTRICAS (admin)
+   MÉTRICAS (igual para todos; valores dos outros ficam ocultos para designers)
    ============================================================ */
 function viewMetricas() {
+  if (!designers().length) return welcome();
   const { from, to, label } = period();
+  const admin = isAdmin(), m = me();
   const all = designers().map(p => ({ p, s: stats(p.id, from, to) }));
-  if (!all.length) return `<section class="page"><div class="page-head">${periodCtl()}</div><div class="empty-state"><p>Cadastre designers em Equipe para ver as métricas.</p></div></section>`;
-  const tot = all.reduce((t, { s }) => ({ pay: t.pay + (s.pay || 0), pts: t.pts + s.points, pend: t.pend + s.pending, pendPts: t.pendPts + s.pendingPts, clients: t.clients + s.clients, min: t.min + s.minutes, err: t.err + s.errors + s.refused, acts: t.acts + s.acts.length }), { pay: 0, pts: 0, pend: 0, pendPts: 0, clients: 0, min: 0, err: 0, acts: 0 });
-  const kpi = (l, v, sub, tone = '') => `<div class="kpi ${tone}"><span>${l}</span><b>${v}</b><small>${sub}</small></div>`;
-  const lb = (title, sub, key, fmt) => {
+  const tot = all.reduce((t, { s }) => ({ pay: t.pay + (s.pay || 0), pts: t.pts + s.points, pend: t.pend + s.pending, pendPts: t.pendPts + s.pendingPts, cl: t.cl + s.clients, min: t.min + s.minutes, err: t.err + s.errors + s.refused, acts: t.acts + s.acts.length }), { pay: 0, pts: 0, pend: 0, pendPts: 0, cl: 0, min: 0, err: 0, acts: 0 });
+  const canSee = p => admin || p.id === m.id;
+  const lb = (title, sub, key, fmt, money) => {
     const list = [...all].sort((a, b) => key(b.s) - key(a.s)), max = Math.max(1e-9, ...list.map(x => key(x.s)));
-    return `<div class="card lb"><div class="card-head"><h3>${title}</h3><span>${sub}</span></div><ol>${list.map(({ p, s }, i) => `<li class="${i === 0 && key(s) > 0 ? 'first' : ''}"><span class="lb-pos">${i + 1}</span>${avatar(p, 'sm')}<span class="lb-name">${esc(firstName(p.name))}</span><span class="lb-bar"><i style="width:${key(s) / max * 100}%;background:${p.color}"></i></span><b>${fmt(s)}</b></li>`).join('')}</ol></div>`;
+    return `<div class="card lb"><div class="c-head"><h3>${title}</h3><span>${sub}</span></div><ol>${list.map(({ p, s }, i) => `<li class="${p.id === m.id ? 'me' : ''}" style="--i:${i}"><span class="lb-pos ${i === 0 && key(s) > 0 ? 'first' : ''}">${i + 1}</span>${avatar(p, 'sm')}<span class="lb-name">${esc(firstName(p.name))}</span><span class="lb-bar"><i style="--w:${key(s) / max * 100}%;background:${p.color}"></i></span><b>${money && !canSee(p) ? '•••' : fmt(s)}</b></li>`).join('')}</ol></div>`;
   };
-  const table = `<div class="card flush">
-    <div class="card-head"><h3>Fechamento</h3><span>${esc(label)} · só atividades aprovadas entram no valor</span></div>
-    <div class="table-wrap"><table class="sheet close-t">
-      <thead><tr><th>Designer</th><th class="num">Pontos</th><th class="num">Aguardando</th><th class="num">Clientes</th><th class="num">Clientes/dia</th><th class="num">Pts/cliente</th><th class="num">Online</th><th class="num">Média/dia</th><th class="num">Bônus</th><th class="num">Erros</th><th class="num">A pagar</th></tr></thead>
-      <tbody>${[...all].sort((a, b) => b.s.points - a.s.points).map(({ p, s }) => `<tr>
-        <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
-        <td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending ? `${s.pending} (${fmtPts(s.pendingPts)} pts)` : '—'}</td>
-        <td class="num">${s.clients}</td><td class="num">${fmtNum(s.clientsPerDay)}</td><td class="num">${fmtNum(s.ptsPerClient)}</td>
-        <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.avgH)}h</td><td class="num"><span class="mult">${fmtMult(s.mult)}</span></td>
-        <td class="num">${s.errors + s.refused || '—'}</td><td class="num money">${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td>Total</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td class="num">${tot.clients}</td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num">${tot.err || '—'}</td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>
-    </table></div>
-  </div>`;
   return `<section class="page">
-    <div class="page-head"><button class="solid big" data-export-csv>${ico('sheet')}Exportar planilha</button><span class="vsep"></span>${periodCtl()}</div>
-    ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${tot.pend} atividade${tot.pend === 1 ? '' : 's'} aguardando aprovação</b> · ${fmtPts(tot.pendPts)} pts que ainda não entram no valor</span><em>conferir agora →</em></button>` : ''}
+    ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${plural(tot.pend, 'atividade aguardando', 'atividades aguardando')} aprovação</b> · ${fmtPts(tot.pendPts)} pts que ainda não entram no valor</span><em>${admin ? 'Conferir' : 'Ver'} ${ico('right')}</em></button>` : ''}
     <div class="kpis">
-      ${kpi('gasto no período', fmtBRL(tot.pay), `${fmtBRL(tot.clients ? tot.pay / tot.clients : 0)} por cliente`, 'ink')}
-      ${kpi('pontos aprovados', fmtPts(tot.pts), `${tot.acts} atividades lançadas`)}
-      ${kpi('clientes atendidos', tot.clients, `${fmtNum(tot.clients ? tot.pts / tot.clients : 0)} pts por cliente`)}
-      ${kpi('horas online', fmtDur(tot.min), `${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h por designer`)}
+      <div class="kpi dark"><span>${admin ? 'Gasto no período' : 'Você recebe'}</span><b>${num(admin ? tot.pay : (all.find(x => x.p.id === m.id)?.s.pay || 0), 'brl')}</b><small>${admin ? `${fmtBRL(tot.cl ? tot.pay / tot.cl : 0)} por cliente` : 'só atividades aprovadas'}</small></div>
+      <div class="kpi"><span>Pontos aprovados</span><b>${num(tot.pts)}</b><small>${plural(tot.acts, 'atividade lançada', 'atividades lançadas')}</small></div>
+      <div class="kpi"><span>Clientes atendidos</span><b>${num(tot.cl, 'int')}</b><small>${fmtNum(tot.cl ? tot.pts / tot.cl : 0)} pts por cliente</small></div>
+      <div class="kpi"><span>Horas online</span><b>${num(tot.min, 'dur')}</b><small>${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h por designer</small></div>
     </div>
     <div class="lb-grid">
-      ${lb('Mais tempo online', 'horas lançadas', s => s.minutes, s => fmtDur(s.minutes))}
-      ${lb('Mais clientes', 'clientes atendidos', s => s.clients, s => `${s.clients}`)}
-      ${lb('Gasto por designer', 'a receber', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay))}
-      ${lb('Mais pontos por cliente', 'capricho na entrega', s => s.ptsPerClient, s => fmtNum(s.ptsPerClient))}
+      ${lb('Mais tempo online', 'horas no período', s => s.minutes, s => fmtDur(s.minutes))}
+      ${lb('Mais clientes', 'atendidos', s => s.clients, s => `${s.clients}`)}
+      ${lb('Mais pontos', 'aprovados', s => s.points, s => fmtPts(s.points))}
+      ${lb('A receber', 'por designer', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay), true)}
     </div>
     <div class="grid-2">
       <div class="card">${chart(all, from, to)}</div>
       <div class="card">${breakdown(all)}</div>
     </div>
-    ${table}
+    <div class="card flush">
+      <div class="c-head pad"><h3>Fechamento</h3><span>${esc(label)} · só atividades aprovadas entram no valor</span><span class="sp"></span><button class="btn line sm" data-export-csv>${ico('sheet')}Exportar planilha</button></div>
+      <div class="table-wrap"><table class="grid close">
+        <thead><tr><th>Designer</th><th class="num">Pontos</th><th class="num">Aguardando</th><th class="num">Clientes</th><th class="num">Por dia</th><th class="num">Pts/cliente</th><th class="num">Online</th><th class="num">Média/dia</th><th class="num">Bônus</th><th class="num">Correções</th><th class="num">A receber</th></tr></thead>
+        <tbody>${[...all].sort((a, b) => b.s.points - a.s.points).map(({ p, s }, i) => `<tr class="${p.id === m.id ? 'me' : ''}" style="--i:${i}">
+          <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
+          <td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending || '—'}</td>
+          <td class="num">${s.clients}</td><td class="num">${fmtNum(s.clientsPerDay)}</td><td class="num">${fmtNum(s.ptsPerClient)}</td>
+          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.avgH)}h</td><td class="num"><span class="mult">${fmtMult(s.mult)}</span></td>
+          <td class="num">${s.errors + s.refused || '—'}</td><td class="num money">${canSee(p) ? (s.pay == null ? 'fixo' : fmtBRL(s.pay)) : '•••'}</td></tr>`).join('')}</tbody>
+        ${admin ? `<tfoot><tr><td>Total</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td class="num">${tot.cl}</td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num">${tot.err || '—'}</td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>` : ''}
+      </table></div>
+    </div>
   </section>`;
 }
 
@@ -381,136 +335,197 @@ function chart(all, from, to) {
   const days = [];
   for (let d = parseKey(from); dkey(d) <= to; d = addDays(d, 1)) if (!isWeekendDate(d) || all.some(({ s }) => s.perDay[dkey(d)])) days.push(dkey(d));
   const sums = days.map(k => all.reduce((s, x) => s + (x.s.perDay[k] || 0), 0));
-  const max = Math.max(1, ...sums);
-  const mag = Math.pow(10, Math.floor(Math.log10(max / 4)));
+  const max = Math.max(1, ...sums), mag = Math.pow(10, Math.floor(Math.log10(max / 4)));
   const step = [1, 2, 2.5, 5, 10, 20].map(x => x * mag).find(x => Math.ceil(max / x) <= 5);
   const lines = Math.max(1, Math.ceil(max / step)), top = step * lines;
-  const W = 640, Hh = 240, pl = 34, pb = 24, pt = 8, iw = W - pl - 6, ih = Hh - pb - pt, bw = iw / Math.max(1, days.length), gap = Math.min(10, bw * .3);
+  const W = 640, Hh = 230, pl = 34, pb = 24, pt = 8, iw = W - pl - 6, ih = Hh - pb - pt, bw = iw / Math.max(1, days.length), gap = Math.min(12, bw * .32);
   let svg = `<svg class="chart" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none">`;
-  for (let g = 0; g <= lines; g++) { const y = pt + ih - ih * g / lines; svg += `<line x1="${pl}" x2="${W - 6}" y1="${y}" y2="${y}" class="grid-l"/><text x="${pl - 6}" y="${y + 3}" class="ax" text-anchor="end">${fmtPts(step * g)}</text>`; }
+  for (let g = 0; g <= lines; g++) { const y = pt + ih - ih * g / lines; svg += `<line x1="${pl}" x2="${W - 6}" y1="${y}" y2="${y}" class="gl"/><text x="${pl - 6}" y="${y + 3}" class="ax" text-anchor="end">${fmtPts(step * g)}</text>`; }
   days.forEach((k, i) => {
     let y = pt + ih; const x = pl + i * bw + gap / 2, w = Math.max(2, bw - gap);
-    all.forEach(({ p, s }) => { const v = s.perDay[k] || 0; if (!v) return; const h = ih * v / top; y -= h; svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0, h - 1.5).toFixed(1)}" rx="3" fill="${p.color}"><title>${esc(p.name)} · ${fmtDay(k)}: ${fmtPts(v)} pts</title></rect>`; });
+    svg += `<g class="bar" style="--i:${i}">`;
+    all.forEach(({ p, s }) => { const v = s.perDay[k] || 0; if (!v) return; const h = ih * v / top; y -= h; svg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0, h - 2).toFixed(1)}" rx="4" fill="${p.color}"><title>${esc(p.name)} · ${fmtDay(k)}: ${fmtPts(v)} pts</title></rect>`; });
+    svg += '</g>';
     if (days.length <= 16 || i % Math.ceil(days.length / 16) === 0) svg += `<text x="${(x + w / 2).toFixed(1)}" y="${Hh - 6}" class="ax" text-anchor="middle">${days.length <= 7 ? WD[parseKey(k).getDay()] : parseKey(k).getDate()}</text>`;
   });
   svg += '</svg>';
-  return `<div class="card-head"><h3>Pontos aprovados por dia</h3></div>${svg}<div class="chart-leg">${all.map(({ p }) => `<span><i style="background:${p.color}"></i>${esc(firstName(p.name))}</span>`).join('')}</div>`;
+  return `<div class="c-head"><h3>Pontos aprovados por dia</h3></div>${svg}<div class="legend">${all.map(({ p }) => `<span><i style="background:${p.color}"></i>${esc(firstName(p.name))}</span>`).join('')}</div>`;
 }
 function breakdown(all) {
   const by = {}; all.forEach(({ s }) => Object.entries(s.byType).forEach(([k, v]) => { by[k] = (by[k] || 0) + v; }));
-  const total = Object.values(by).reduce((a, b) => a + b, 0);
-  const keys = Object.keys(by).sort((a, b) => by[b] - by[a]);
-  return `<div class="card-head"><h3>De onde vêm os pontos</h3><span>por tipo de atividade</span></div>
-    ${total ? `<div class="stackbar">${keys.map(k => `<i style="width:${by[k] / total * 100}%;background:${typeOf(k).color}"></i>`).join('')}</div>
-    <ul class="bd-list">${keys.map(k => `<li style="--tc:${typeOf(k).color}"><i></i><span>${k === 'extra' ? 'Atividades extras' : esc(typeOf(k).label)}</span><small></small><b>${fmtPts(by[k])} pts</b><em>${Math.round(by[k] / total * 100)}%</em></li>`).join('')}</ul>` : '<p class="muted">Nenhum ponto aprovado no período.</p>'}`;
+  const total = Object.values(by).reduce((a, b) => a + b, 0), keys = Object.keys(by).sort((a, b) => by[b] - by[a]);
+  return `<div class="c-head"><h3>De onde vêm os pontos</h3><span>por tipo de atividade</span></div>
+    ${total ? `<div class="stackbar">${keys.map((k, i) => `<i style="--w:${by[k] / total * 100}%;background:${typeOf(k).color};--i:${i}"></i>`).join('')}</div>
+    <ul class="bd">${keys.map(k => `<li style="--tc:${typeOf(k).color}"><i></i><span>${k === 'extra' ? 'Atividades extras' : esc(typeOf(k).label)}</span><b>${fmtPts(by[k])} pts</b><em>${Math.round(by[k] / total * 100)}%</em></li>`).join('')}</ul>` : '<p class="muted">Nenhum ponto aprovado no período.</p>'}`;
 }
 
-function exportCSV() {
-  const { from, to, label } = period();
-  const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Data', 'Hora', 'Cliente', 'Nº lulu', 'Atividade', 'Qtd', 'Pontos', 'Status', 'Comentário da gestão', 'Valor (R$)'].join(';')];
-  for (const p of designers()) {
-    const s = stats(p.id, from, to), rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
-    for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
-      const d = parseKey(a.date);
-      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), a.luluId, q(a.extra ? 'Extra: ' + a.desc : typeOf(a.type).label), a.qty, n(a.pts), STATUS[a.status].label, q(a.note), rate != null && a.status === 'aprovada' ? n((a.pts * rate).toFixed(2)) : ''].join(';'));
-    }
-  }
-  const el = document.createElement('a');
-  el.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-  el.download = `dede-${label.replace(/[^\wÀ-ú]+/g, '-')}.csv`;
-  document.body.appendChild(el); el.click(); el.remove();
-  toast(`Planilha exportada · ${lines.length - 1} linhas`);
+/* ============================================================
+   CONFIGURAÇÕES (só admin)
+   ============================================================ */
+function viewConfig() {
+  const tabs = [['equipe', 'Equipe'], ['pontos', 'Pontuação'], ['horas', 'Horas online'], ['dados', 'Dados']];
+  const body = { equipe: cfgEquipe, pontos: cfgPontos, horas: cfgHoras, dados: cfgDados }[ui.cfg]();
+  return `<section class="page"><div class="cfg-tabs">${seg('cfg', tabs, ui.cfg)}</div>${body}</section>`;
+}
+function cfgEquipe() {
+  return `<div class="team">
+    ${designers().map((p, i) => `<article class="person" style="--pc:${p.color};--i:${i}">
+      ${avatar(p, 'xl')}
+      <div class="p-info"><span class="reg">${p.regime}</span><h3>${esc(p.name)}</h3><p>${p.email ? esc(p.email) : 'sem e-mail'}</p>
+        <label class="switch"><input type="checkbox" data-pay="${p.id}" ${p.payByPoints ? 'checked' : ''}><i></i>recebe por pontos</label>
+        <div class="p-act"><button class="btn line sm" data-edit-person="${p.id}">${ico('edit')}Editar</button><button class="btn line sm danger" data-del-person="${p.id}">${ico('trash')}Remover</button></div>
+      </div></article>`).join('')}
+    <button class="person add" data-add-person><span>${ico('plus')}</span>Novo designer</button>
+  </div>`;
+}
+function cfgPontos() {
+  const st = S.settings;
+  const rows = st.itemTypes.map((t, i) => `<li class="pt-row" style="--tc:${t.color};--i:${i}">
+    <label class="clr"><input type="color" data-tf="${t.id}|color" value="${t.color}"><i></i></label>
+    <div class="pt-main"><input class="pt-label" data-tf="${t.id}|label" value="${esc(t.label)}"><input class="pt-hint" data-tf="${t.id}|hint" value="${esc(t.hint || '')}" placeholder="descrição"></div>
+    <label class="pt-max"><span>Limite por cliente</span><input type="number" min="0" step="1" data-tf="${t.id}|max" value="${t.max || ''}" placeholder="sem limite"></label>
+    <label class="pt-val"><input type="number" min="0" step="0.25" data-tf="${t.id}|pts" value="${t.pts}"><span>pt</span></label>
+    ${t.id === 'logo' ? '<span></span>' : `<button class="ab no" data-del-type="${t.id}" data-tip="Remover">${ico('trash')}</button>`}
+  </li>`).join('');
+  const tiers = [...st.tiers].sort((a, b) => a.h - b.h).map((t, i, arr) => `<div class="tier" style="--lvl:${i}">
+    <span>a partir de</span><label><input type="number" min="0" step="0.5" data-tier="${i}|h" value="${t.h}">h/dia</label>
+    <label class="tm">×<input type="number" min="0" step="0.05" data-tier="${i}|mult" value="${t.mult}"></label>
+    ${arr.length > 1 ? `<button class="tier-x" data-del-tier="${i}" aria-label="remover faixa">${ico('x')}</button>` : ''}</div>`).join('');
+  return `<div class="grid-pts">
+    <div class="card"><div class="c-head"><h3>Tabela de pontos</h3><span>o designer escolhe a atividade e o ponto já vem calculado</span></div>
+      <ul class="pt-list">${rows}</ul><button class="btn line sm" data-add-type>${ico('plus')}Novo tipo de atividade</button></div>
+    <div class="col">
+      <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>antes do bônus</span></div>
+        <label class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"></label></div>
+      <div class="card"><div class="c-head"><h3>Bônus por horas online</h3><span>média por dia trabalhado</span></div>
+        <div class="tiers">${tiers}</div><button class="btn line sm" data-add-tier>${ico('plus')}Faixa</button>
+        <p class="muted small">A receber = pontos aprovados × ${fmtBRL(st.pointValue)} × bônus.</p></div>
+    </div>
+  </div>`;
+}
+function cfgHoras() {
+  const { days } = period(), today = dkey(new Date()), ds = designers();
+  if (!ds.length) return '<div class="empty-card">Cadastre designers primeiro.</div>';
+  return `<div class="card flush"><div class="c-head pad"><h3>Horas online</h3><span>digite como 8:30 ou 8,5 · salva sozinho</span></div>
+    <div class="table-wrap"><table class="hours">
+      <thead><tr><th>Designer</th>${days.map(d => `<th class="${dkey(d) === today ? 'today' : ''}">${WD[d.getDay()]}<b>${d.getDate()}</b></th>`).join('')}${days.length > 1 ? '<th>Total</th>' : ''}</tr></thead>
+      <tbody>${ds.map(p => { const tot = days.reduce((s, d) => s + onlineMin(p.id, dkey(d)), 0); return `<tr><td class="h-who">${avatar(p, 'sm')}<span>${esc(firstName(p.name))}</span></td>${days.map(d => { const k = dkey(d), v = onlineMin(p.id, k); return `<td class="${isWeekendDate(d) ? 'we' : ''}"><input class="hm ${v ? 'has' : ''}" data-online="${p.id}|${k}" value="${toHM(v)}" placeholder="—" inputmode="decimal"></td>`; }).join('')}${days.length > 1 ? `<td class="h-tot">${fmtDur(tot)}</td>` : ''}</tr>`; }).join('')}</tbody>
+    </table></div></div>`;
+}
+function cfgDados() {
+  return `<div class="grid-2">
+    <div class="card"><div class="c-head"><h3>Dados</h3><span>modo demonstração · salvos neste navegador</span></div>
+      <div class="btns"><button class="btn line" data-io="export">${ico('db')}Exportar .json</button><button class="btn line" data-io="import">Importar</button><button class="btn line" data-io="demo">${ico('spark')}Carregar exemplo</button><button class="btn line danger" data-io="reset">${ico('trash')}Zerar tudo</button></div></div>
+    <div class="card"><div class="c-head"><h3>Registro da gestão</h3><span>últimas ações</span></div>
+      <ul class="log">${S.log.slice(0, 14).map(l => { const d = new Date(l.at); return `<li><span>${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${hm(d)}</span>${esc(l.text)}</li>`; }).join('') || '<li class="muted">nada ainda</li>'}</ul></div>
+  </div>`;
 }
 
 /* ============================================================
    dialogs
    ============================================================ */
-let actCtx = null, editingPerson = null;
+let actCtx = null, editingPerson = null, hoursCtx = null;
 function openAct(mode, a) {
-  const admin = isAdmin(), m = me();
+  const admin = isAdmin();
   actCtx = { mode, id: a ? a.id : null };
   const F = $('#actForm').elements;
-  const types = S.settings.itemTypes.map(t => `<option value="${t.id}">${esc(t.label)} · ${fmtPts(t.pts)} pt</option>`).join('') + (admin ? '<option value="extra">Atividade extra (pontos livres)</option>' : '');
-  F.type.innerHTML = types;
+  F.type.innerHTML = S.settings.itemTypes.map(t => `<option value="${t.id}">${esc(t.label)} · ${fmtPts(t.pts)} pt</option>`).join('') + (admin ? '<option value="extra">Extra · pontos livres</option>' : '');
   F.designerId.innerHTML = designers().map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  $('#actWho').hidden = !admin;
-  $('#actAdmin').hidden = !admin;
-  const now = new Date();
-  const x = a || { designerId: admin ? (ui.who !== 'all' ? ui.who : designers()[0]?.id) : m.id, date: dkey(ui.period === 'dia' ? ui.day : now), time: hm(now), client: '', luluId: '', type: admin && mode === 'extra' ? 'extra' : 'logo', qty: 1, pts: admin && mode === 'extra' ? 1 : suggestedPts('logo', 1), status: admin ? 'aprovada' : 'pendente', note: '', desc: '' };
-  F.designerId.value = x.designerId || ''; F.date.value = x.date; F.time.value = x.time || ''; F.client.value = x.client || ''; F.luluId.value = x.luluId || '';
-  F.type.value = x.extra ? 'extra' : x.type; F.qty.value = x.qty || 1; F.pts.value = x.pts; F.desc.value = x.desc || '';
-  F.status.value = x.status; F.note.value = x.note || '';
+  $('#actWho').hidden = !admin; $('#actAdmin').hidden = !admin;
+  F.designerId.value = a.designerId; F.date.value = a.date; F.time.value = a.time || ''; F.client.value = a.client || ''; F.luluId.value = a.luluId || '';
+  F.type.value = a.extra ? 'extra' : a.type; F.qty.value = a.qty || 1; F.pts.value = a.pts; F.desc.value = a.desc || ''; F.status.value = a.status; F.note.value = a.note || '';
   F.pts.readOnly = !admin;
-  const titles = { new: 'Nova atividade', extra: 'Atividade extra', edit: admin ? 'Editar atividade' : (a && a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar atividade'), erro: 'Apontar erro', recusada: 'Recusar atividade' };
-  $('#actTitle').textContent = titles[mode] || 'Atividade';
-  if (mode === 'erro' || mode === 'recusada') { F.status.value = mode; }
+  if (mode === 'erro' || mode === 'recusada') F.status.value = mode;
+  $('#actTitle').textContent = { edit: admin ? 'Editar atividade' : (a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar atividade'), erro: 'Pedir correção', recusada: 'Recusar atividade' }[mode];
+  $('#actHint').textContent = mode === 'erro' ? 'Diga o que precisa corrigir. O designer vê o comentário e reenvia.' : mode === 'recusada' ? 'Diga o motivo. Atividade recusada não entra no valor.' : (!admin && a.note ? `Comentário da gestão: ${a.note}` : '');
   $('#actErr').textContent = '';
-  $('#actHint').textContent = mode === 'erro' ? 'Explique o erro. Se quiser, já corrija a pontuação. O designer vê o comentário e pode reenviar.' : mode === 'recusada' ? 'Diga o motivo. Atividade recusada não entra no valor.' : (!admin ? 'A pontuação vem da tabela. A gestão confere e aprova.' : '');
-  $('#delAct').hidden = !(admin && a);
-  syncActPts();
+  $('#delAct').hidden = !admin;
   $('#actDlg').showModal();
   (mode === 'erro' || mode === 'recusada' ? F.note : F.client).focus();
 }
-function syncActPts(force) {
-  const F = $('#actForm').elements;
-  const extra = F.type.value === 'extra';
-  if (!isAdmin() || force) F.pts.value = extra ? (F.pts.value || 1) : suggestedPts(F.type.value, +F.qty.value || 1);
-}
-
 function openPerson(p) {
   editingPerson = p || null;
-  const F = $('#personForm').elements;
-  const used = new Set(S.people.map(x => x.color));
+  const F = $('#personForm').elements, used = new Set(S.people.map(x => x.color));
   const color = p ? p.color : (PALETTE.find(c => !used.has(c)) || PALETTE[0]);
   $('#swatches').innerHTML = PALETTE.map(c => `<label><input type="radio" name="color" value="${c}" ${c === color ? 'checked' : ''}><i style="--c:${c}"></i></label>`).join('');
   F.name.value = p ? p.name : ''; F.regime.value = p ? p.regime : 'PJ'; F.email.value = p ? (p.email || '') : ''; F.payByPoints.checked = p ? !!p.payByPoints : true;
-  $('#pEyebrow').textContent = p ? 'editar designer' : 'novo designer';
+  $('#pTitle').textContent = p ? 'Editar designer' : 'Novo designer';
   $('#personErr').textContent = '';
   $('#personDlg').showModal(); F.name.focus();
+}
+function openHours(pid) {
+  const p = person(pid), { days, label } = period();
+  hoursCtx = { pid, days: days.map(dkey) };
+  $('#hTitle').innerHTML = `${avatar(p, 'sm')} Horas online · ${esc(firstName(p.name))}`;
+  $('#hSub').textContent = label;
+  $('#hGrid').innerHTML = days.map(d => { const k = dkey(d), v = onlineMin(pid, k); return `<label class="${isWeekendDate(d) ? 'we' : ''}"><span>${WD[d.getDay()]} ${d.getDate()}</span><input data-hk="${k}" value="${toHM(v)}" placeholder="—" inputmode="decimal"></label>`; }).join('');
+  $('#hoursDlg').showModal();
+  const first = $('#hGrid input'); if (first) first.focus();
 }
 
 /* ============================================================
    eventos
    ============================================================ */
 let tt;
-function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2800); }
-const act = id => S.activities.find(a => a.id === id);
-function setStatus(a, status, note) {
-  a.status = status; if (note != null) a.note = note;
-  const p = person(a.designerId);
-  addLog(`${STATUS[status].label.toLowerCase()}: ${p ? firstName(p.name) : '?'} · ${a.client || 'extra'} · ${typeOf(a.type).label} (${fmtPts(a.pts)} pts)`);
+function toast(m, kind = 'ok') {
+  const t = $('#toast');
+  t.className = ''; void t.offsetWidth;
+  t.innerHTML = `<span class="t-ico ${kind}">${ico(kind === 'ok' ? 'check' : kind === 'warn' ? 'alert' : 'spark')}</span>${esc(m)}`;
+  t.classList.add('on', kind); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2600);
 }
-function rerenderKeepFocus(sel) {
-  const el = document.activeElement, pos = el && el.selectionStart;
-  render();
-  const n = $(sel); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} }
+const act = id => S.activities.find(a => a.id === id);
+const who = a => firstName((person(a.designerId) || {}).name || '?');
+
+/* ripple em todo botão */
+function ripple(e) {
+  const b = e.target.closest('.btn, .seg button, .rail-nav button, .ab, .chip.edit, .today-btn, .icon-btn, .person.add, .alert-bar');
+  if (!b || b.disabled) return;
+  const r = b.getBoundingClientRect(), s = Math.max(r.width, r.height) * 1.6;
+  const el = document.createElement('i');
+  el.className = 'rip'; el.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`;
+  b.appendChild(el); setTimeout(() => el.remove(), 600);
+}
+
+function quickPreview() {
+  const f = $('#quickForm'); if (!f) return;
+  const F = f.elements, qty = Math.max(1, parseInt(F.qty.value, 10) || 1), extra = F.type.value === 'extra';
+  if (!isAdmin() || document.activeElement !== F.pts) { if (!extra) F.pts.value = fmtPts(suggestedPts(F.type.value, qty)); else if (!F.pts.value || F.pts.dataset.auto) F.pts.value = '1'; }
+  F.client.placeholder = extra ? 'Descreva a atividade extra' : 'Nome do cliente';
+  const did = F.designerId ? F.designerId.value : me().id, t = typeOf(F.type.value);
+  let msg = '';
+  if (t.max && F.client.value.trim()) {
+    const used = S.activities.filter(x => x.designerId === did && x.type === t.id && x.status !== 'recusada' && norm(x.client) === norm(F.client.value)).reduce((s, x) => s + (x.qty || 1), 0);
+    if (used + qty > t.max) msg = `${t.label} tem limite de ${t.max} por cliente (já tem ${used}). O excedente pode ser recusado.`;
+  }
+  const w = $('#qWarn'); w.textContent = msg; w.classList.toggle('on', !!msg);
 }
 
 function bind() {
+  document.addEventListener('pointerdown', ripple);
   document.addEventListener('click', e => {
     const t = e.target; let el;
     if (t.closest('dialog')) return;
-    if ((el = t.closest('#nav [data-view]'))) { ui.view = el.dataset.view; render(); scrollTo(0, 0); return; }
-    if ((el = t.closest('[data-period]'))) { ui.period = el.dataset.period; render(); return; }
-    if ((el = t.closest('[data-shift]'))) { shiftPeriod(+el.dataset.shift); render(); return; }
+    if ((el = t.closest('#nav [data-view]'))) { go(el.dataset.view); return; }
+    if ((el = t.closest('[data-period]'))) { ui.limit = {}; ui.period = el.dataset.period; ui.enter = true; render(); return; }
+    if ((el = t.closest('[data-shift]'))) { shiftPeriod(+el.dataset.shift); ui.enter = true; render(); return; }
     if ((el = t.closest('[data-status]'))) { ui.status = el.dataset.status; render(); return; }
-    if (t.closest('[data-new]')) { if (isAdmin() && !designers().length) { openPerson(); return; } openAct(isAdmin() ? 'extra' : 'new'); return; }
+    if ((el = t.closest('[data-cfg]'))) { ui.cfg = el.dataset.cfg; ui.enter = true; render(); return; }
+    if ((el = t.closest('[data-more]'))) { ui.limit[el.dataset.more] = (ui.limit[el.dataset.more] || 25) + 50; render(); return; }
+    if ((el = t.closest('[data-hours]'))) { e.stopPropagation(); openHours(el.dataset.hours); return; }
     if ((el = t.closest('[data-approve-all]'))) {
       const { from, to } = period();
       const list = S.activities.filter(a => a.designerId === el.dataset.approveAll && a.status === 'pendente' && inRange(a.date, from, to));
-      list.forEach(a => { a.status = 'aprovada'; });
+      list.forEach(a => { a.status = 'aprovada'; ui.flash[a.id] = 'ok'; });
       addLog(`aprovou ${list.length} atividades de ${firstName(person(el.dataset.approveAll).name)}`);
-      save(); render(); toast(`${list.length} atividades aprovadas`); return;
+      save(); render(); toast(`${plural(list.length, 'atividade aprovada', 'atividades aprovadas')}`); return;
     }
-    if ((el = t.closest('[data-toggle]'))) { if (t.closest('button') && t.closest('button') !== el) return; const id = el.dataset.toggle; ui.closed[id] = !ui.closed[id]; render(); return; }
-    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { setStatus(a, 'aprovada', ''); save(); render(); toast('Aprovada'); } return; }
+    if ((el = t.closest('[data-toggle]'))) { if (t.closest('button, select, input')) return; if (visiblePeople().length === 1) return; ui.closed[el.dataset.toggle] = !ui.closed[el.dataset.toggle]; el.closest('.block').classList.toggle('closed'); return; }
+    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { a.status = 'aprovada'; a.note = ''; ui.flash[a.id] = 'ok'; addLog(`aprovou: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)`); save(); render(); toast('Aprovada'); } return; }
     if ((el = t.closest('[data-mark]'))) { const [id, st] = el.dataset.mark.split('|'); const a = act(id); if (a) openAct(st, a); return; }
     if ((el = t.closest('[data-edit-act]'))) { const a = act(el.dataset.editAct); if (a) openAct('edit', a); return; }
-    if ((el = t.closest('[data-del-act]'))) { const a = act(el.dataset.delAct); if (a && confirm('Excluir esta atividade?')) { S.activities = S.activities.filter(x => x !== a); save(); render(); toast('Excluída'); } return; }
-    if (t.closest('[data-go-pending]')) { ui.view = 'atividades'; ui.status = 'pendente'; ui.who = 'all'; render(); scrollTo(0, 0); return; }
+    if ((el = t.closest('[data-del-act]'))) { const a = act(el.dataset.delAct); if (a && confirm('Excluir esta atividade?')) { S.activities = S.activities.filter(x => x !== a); save(); render(); toast('Excluída', 'info'); } return; }
+    if (t.closest('[data-go-pending]')) { ui.status = 'pendente'; ui.who = 'all'; go('atividades'); return; }
     if (t.closest('[data-export-csv]')) { exportCSV(); return; }
-    // equipe
     if (t.closest('[data-add-person]')) { openPerson(); return; }
     if ((el = t.closest('[data-edit-person]'))) { openPerson(person(el.dataset.editPerson)); return; }
     if ((el = t.closest('[data-del-person]'))) {
@@ -518,15 +533,10 @@ function bind() {
       const n = S.activities.filter(a => a.designerId === p.id).length;
       if (!confirm(`Remover ${p.name}?${n ? ` As ${n} atividades dele(a) também serão apagadas.` : ''}`)) return;
       S.people = S.people.filter(x => x !== p); S.activities = S.activities.filter(a => a.designerId !== p.id);
-      Object.values(S.online).forEach(d => delete d[p.id]);
-      addLog(`removeu ${p.name}`); save(); render(); return;
+      Object.values(S.online).forEach(d => delete d[p.id]); addLog(`removeu ${p.name}`); save(); render(); toast(`${firstName(p.name)} removido(a)`, 'info'); return;
     }
-    if (t.closest('[data-add-type]')) { S.settings.itemTypes.push({ id: 't' + uid().slice(0, 5), label: 'Nova atividade', pts: 0.5, max: null, color: PALETTE[S.settings.itemTypes.length % PALETTE.length], hint: '' }); save(); render(); return; }
-    if ((el = t.closest('[data-del-type]'))) {
-      const id = el.dataset.delType;
-      if (S.activities.some(a => a.type === id) && !confirm('Já existem atividades desse tipo. Remover mesmo assim? (elas continuam com os pontos que têm)')) return;
-      S.settings.itemTypes = S.settings.itemTypes.filter(x => x.id !== id); save(); render(); return;
-    }
+    if (t.closest('[data-add-type]')) { S.settings.itemTypes.push({ id: 't' + uid().slice(0, 5), label: 'Nova atividade', pts: 0.5, max: null, color: PALETTE[S.settings.itemTypes.length % PALETTE.length], hint: '' }); save(); render(); toast('Tipo criado'); return; }
+    if ((el = t.closest('[data-del-type]'))) { const id = el.dataset.delType; if (S.activities.some(a => a.type === id) && !confirm('Já existem atividades desse tipo. Remover mesmo assim?')) return; S.settings.itemTypes = S.settings.itemTypes.filter(x => x.id !== id); save(); render(); return; }
     if (t.closest('[data-add-tier]')) { const l = [...S.settings.tiers].sort((a, b) => a.h - b.h).pop() || { h: 0, mult: 1 }; S.settings.tiers.push({ h: l.h + 2, mult: Math.round((l.mult + .1) * 100) / 100 }); save(); render(); return; }
     if ((el = t.closest('[data-del-tier]'))) { const s = [...S.settings.tiers].sort((a, b) => a.h - b.h); s.splice(+el.dataset.delTier, 1); S.settings.tiers = s; save(); render(); return; }
     if ((el = t.closest('[data-io]'))) { io(el.dataset.io); return; }
@@ -534,127 +544,134 @@ function bind() {
 
   document.addEventListener('change', e => {
     const t = e.target;
-    if (t.id === 'meSel') { ui.meId = t.value; localStorage.setItem('dede.me', ui.meId); ui.who = 'all'; render(); toast(`Agora você está como ${me().name}`); return; }
-    if (t.matches('[data-who]')) { ui.who = t.value; render(); return; }
+    if (t.id === 'meSel') { ui.meId = t.value; localStorage.setItem('dede.me', ui.meId); ui.who = 'all'; ui.enter = true; render(); toast(`Você está como ${firstName(me().name)}`, 'info'); return; }
+    if (t.matches('[data-who]')) { ui.who = t.value; ui.enter = true; render(); return; }
     if (t.matches('[data-online]')) {
       const [pid, k] = t.dataset.online.split('|'), min = parseHM(t.value);
-      if (min > 24 * 60) { toast('Mais de 24h num dia? Confere o valor.'); t.value = toHM(onlineMin(pid, k)); return; }
-      setOnline(pid, k, min); addLog(`lançou ${fmtDur(min)} online para ${firstName(person(pid).name)} em ${fmtDay(k)}`);
-      save(); render(); toast(`${firstName(person(pid).name)}: ${min ? fmtDur(min) : 'sem horas'} em ${fmtDay(k)}`); return;
+      if (min > 24 * 60) { toast('Mais de 24h num dia? Confere.', 'warn'); t.value = toHM(onlineMin(pid, k)); return; }
+      setOnline(pid, k, min); addLog(`lançou ${fmtDur(min)} online para ${firstName(person(pid).name)} em ${fmtDay(k)}`); save();
+      t.value = toHM(min); t.classList.toggle('has', !!min); t.classList.add('saved'); setTimeout(() => t.classList.remove('saved'), 900);
+      const row = t.closest('tr'), tot = row && row.querySelector('.h-tot'); if (tot) tot.textContent = fmtDur(hoursCtxTotal(pid));
+      return;
     }
     if (t.matches('[data-pts]')) {
       const a = act(t.dataset.pts), v = parseFloat(String(t.value).replace(',', '.'));
-      if (a && !isNaN(v) && v >= 0) { const old = a.pts; a.pts = v; addLog(`ajustou pontos de ${firstName(person(a.designerId).name)} · ${a.client}: ${fmtPts(old)} → ${fmtPts(v)}`); save(); render(); toast('Pontuação ajustada'); }
+      if (a && !isNaN(v) && v >= 0) { const old = a.pts; a.pts = v; ui.flash[a.id] = 'edit'; addLog(`ajustou pontos de ${who(a)} · ${a.client}: ${fmtPts(old)} → ${fmtPts(v)}`); save(); render(); toast('Pontuação ajustada'); }
       return;
     }
-    if (t.matches('[data-pay]')) { const p = person(t.dataset.pay); if (p) { p.payByPoints = t.checked; save(); render(); } return; }
-    if (t.matches('[data-setting]')) { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) { S.settings[t.dataset.setting] = v; save(); render(); } return; }
+    if (t.matches('[data-pay]')) { const p = person(t.dataset.pay); if (p) { p.payByPoints = t.checked; save(); toast(t.checked ? 'Recebe por pontos' : 'Valor fixo', 'info'); } return; }
+    if (t.matches('[data-setting]')) { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) { S.settings[t.dataset.setting] = v; save(); toast('Valor do ponto atualizado'); } return; }
     if (t.matches('[data-tf]')) {
       const [id, f] = t.dataset.tf.split('|'), ty = S.settings.itemTypes.find(x => x.id === id); if (!ty) return;
-      if (f === 'pts') { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) ty.pts = v; }
-      else if (f === 'max') { const v = parseInt(t.value, 10); ty.max = v > 0 ? v : null; }
-      else ty[f] = t.value;
-      save(); render(); return;
+      if (f === 'pts') { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) ty.pts = v; } else if (f === 'max') { const v = parseInt(t.value, 10); ty.max = v > 0 ? v : null; } else ty[f] = t.value;
+      save(); if (f === 'color') render(); else toast('Tabela atualizada'); return;
     }
-    if (t.matches('[data-tier]')) { const [i, f] = t.dataset.tier.split('|'), s = [...S.settings.tiers].sort((a, b) => a.h - b.h), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings.tiers = s; save(); render(); return; }
-    if (t.closest('#quickForm')) quickPreview();
+    if (t.matches('[data-tier]')) { const [i, f] = t.dataset.tier.split('|'), s = [...S.settings.tiers].sort((a, b) => a.h - b.h), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings.tiers = s; save(); render(); toast('Bônus atualizado'); return; }
+    if (t.closest('#quickForm')) { if (t.name === 'designerId') { const keep = t.value; render(); $('#quickForm').elements.designerId.value = keep; } quickPreview(); }
   });
 
   document.addEventListener('input', e => {
-    if (e.target.matches('[data-q]')) { ui.q = e.target.value; rerenderKeepFocus('[data-q]'); return; }
-    if (e.target.closest('#quickForm')) quickPreview();
+    if (e.target.matches('[data-q]')) { ui.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('[data-q]'); n.focus(); n.setSelectionRange(pos, pos); return; }
+    if (e.target.closest('#quickForm') && e.target.name !== 'pts') quickPreview();
   });
 
   document.addEventListener('submit', e => {
     if (e.target.id !== 'quickForm') return;
     e.preventDefault();
-    const F = e.target.elements, client = F.client.value.trim();
-    if (!client) { $('#qWarn').textContent = 'Qual o cliente?'; F.client.focus(); return; }
-    const qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
-    const a = { id: uid(), designerId: me().id, date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()), client, luluId: F.luluId.value.trim(), type: F.type.value, qty, pts: suggestedPts(F.type.value, qty), status: 'pendente', note: '', extra: false, desc: '', createdAt: new Date().toISOString(), by: 'designer' };
-    S.activities.push(a); save();
-    const keepType = F.type.value, keepClient = client, keepLulu = F.luluId.value;
-    render();
-    const N = $('#quickForm').elements; N.client.value = keepClient; N.luluId.value = keepLulu; N.type.value = keepType === 'logo' ? 'var_livre' : keepType; quickPreview(); N.type.focus();
-    toast(`Lançado: ${typeOf(a.type).label}${qty > 1 ? ' ×' + qty : ''} · ${fmtPts(a.pts)} ${a.pts === 1 ? 'ponto' : 'pontos'} · aguardando aprovação`);
-  });
-
-  $$('dialog').forEach(dl => dl.addEventListener('click', e => { if (e.target.closest('[data-close]') || e.target === dl) dl.close(); }));
-
-  $('#actForm').addEventListener('change', e => { if (['type', 'qty'].includes(e.target.name)) syncActPts(true); });
-  $('#actForm').addEventListener('input', e => { if (e.target.name === 'qty') syncActPts(true); });
-  $('#actForm').addEventListener('submit', e => {
-    e.preventDefault();
-    const F = e.target.elements, admin = isAdmin();
-    const extra = F.type.value === 'extra';
+    const F = e.target.elements, admin = isAdmin(), extra = F.type.value === 'extra';
     const client = F.client.value.trim();
-    if (!client && !extra) { $('#actErr').textContent = 'Qual o cliente?'; return; }
-    if (extra && !F.desc.value.trim()) { $('#actErr').textContent = 'Descreva a atividade extra.'; return; }
+    if (!client) { const w = $('#qWarn'); w.textContent = extra ? 'Descreva a atividade extra.' : 'Qual o cliente?'; w.classList.add('on'); F.client.focus(); F.client.closest('.f').classList.add('shake'); setTimeout(() => F.client.closest('.f').classList.remove('shake'), 500); return; }
     const qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
     const pts = admin ? Math.max(0, parseFloat(String(F.pts.value).replace(',', '.')) || 0) : suggestedPts(F.type.value, qty);
-    if ((actCtx.mode === 'erro' || actCtx.mode === 'recusada') && !F.note.value.trim()) { $('#actErr').textContent = 'Escreva um comentário para o designer.'; return; }
-    const data = { designerId: admin ? F.designerId.value : me().id, date: F.date.value, time: F.time.value, client: client || F.desc.value.trim(), luluId: F.luluId.value.trim(), type: F.type.value, qty, pts, desc: F.desc.value.trim(), extra };
-    if (admin) { data.status = F.status.value; data.note = F.note.value.trim(); }
-    if (actCtx.id) {
-      const a = act(actCtx.id);
-      if (!admin && a.status === 'erro') { data.status = 'pendente'; }
-      Object.assign(a, data);
-      if (admin) addLog(`${actCtx.mode === 'edit' ? 'editou' : STATUS[a.status].label.toLowerCase()}: ${firstName(person(a.designerId).name)} · ${a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`);
-    } else {
-      const a = { id: uid(), ...data, status: admin ? data.status : 'pendente', note: admin ? data.note : '', createdAt: new Date().toISOString(), by: admin ? 'admin' : 'designer' };
-      S.activities.push(a);
-      if (admin) addLog(`criou atividade ${extra ? 'extra' : ''} para ${firstName(person(a.designerId).name)}: ${a.client} (${fmtPts(a.pts)} pts)`);
-    }
-    save(); $('#actDlg').close(); render();
-    toast(actCtx.mode === 'erro' ? 'Erro apontado' : actCtx.mode === 'recusada' ? 'Recusada' : 'Salvo');
+    const did = admin ? F.designerId.value : me().id;
+    const a = { id: uid(), designerId: did, date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()), client, luluId: F.luluId.value.trim(), type: F.type.value, qty, pts, status: admin ? 'aprovada' : 'pendente', note: '', extra, desc: extra ? client : '', createdAt: new Date().toISOString(), by: admin ? 'admin' : 'designer' };
+    S.activities.push(a); ui.flash[a.id] = 'new';
+    if (admin) addLog(`lançou para ${who(a)}: ${extra ? 'extra · ' : ''}${client} (${fmtPts(pts)} pts)`);
+    save();
+    const keep = { type: F.type.value, client: extra ? '' : client, lulu: extra ? '' : F.luluId.value, did };
+    render();
+    const N = $('#quickForm').elements;
+    if (N.designerId) N.designerId.value = keep.did;
+    N.client.value = keep.client; N.luluId.value = keep.lulu; N.type.value = keep.type === 'logo' ? 'var_livre' : keep.type; quickPreview(); N.type.focus();
+    toast(`${a.extra ? 'Extra' : typeOf(a.type).label}${qty > 1 ? ' ×' + qty : ''} · ${fmtPts(pts)} ${pts === 1 ? 'ponto' : 'pontos'}${admin ? '' : ' · aguardando aprovação'}`);
   });
-  $('#delAct').onclick = () => { if (!actCtx.id || !confirm('Excluir esta atividade?')) return; S.activities = S.activities.filter(a => a.id !== actCtx.id); addLog('excluiu uma atividade'); save(); $('#actDlg').close(); render(); };
+
+  $$('dialog').forEach(dl => {
+    dl.addEventListener('click', e => { if (e.target.closest('[data-close]') || e.target === dl) closeDlg(dl); });
+    dl.addEventListener('cancel', e => { e.preventDefault(); closeDlg(dl); });
+  });
+
+  $('#actForm').addEventListener('change', e => { if (['type', 'qty'].includes(e.target.name) && (!isAdmin() || e.target.form.elements.type.value !== 'extra')) e.target.form.elements.pts.value = suggestedPts(e.target.form.elements.type.value, +e.target.form.elements.qty.value || 1); });
+  $('#actForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const F = e.target.elements, admin = isAdmin(), extra = F.type.value === 'extra', client = F.client.value.trim();
+    if (!client) { $('#actErr').textContent = 'Qual o cliente?'; return; }
+    if ((actCtx.mode === 'erro' || actCtx.mode === 'recusada') && !F.note.value.trim()) { $('#actErr').textContent = 'Escreva um comentário para o designer.'; return; }
+    const qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
+    const a = act(actCtx.id);
+    Object.assign(a, { date: F.date.value, time: F.time.value, client, luluId: F.luluId.value.trim(), type: F.type.value, qty, desc: F.desc.value.trim(), extra, pts: admin ? Math.max(0, parseFloat(String(F.pts.value).replace(',', '.')) || 0) : suggestedPts(F.type.value, qty) });
+    if (admin) { a.designerId = F.designerId.value; a.status = F.status.value; a.note = F.note.value.trim(); addLog(`${STATUS[a.status].label.toLowerCase()}: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`); }
+    else if (a.status === 'erro') a.status = 'pendente';
+    ui.flash[a.id] = a.status === 'aprovada' ? 'ok' : a.status === 'recusada' || a.status === 'erro' ? 'warn' : 'edit';
+    save(); closeDlg($('#actDlg')); render();
+    toast(actCtx.mode === 'erro' ? 'Correção pedida' : actCtx.mode === 'recusada' ? 'Recusada' : (!admin ? 'Reenviada para aprovação' : 'Salvo'), actCtx.mode === 'edit' ? 'ok' : 'warn');
+  });
+  $('#delAct').onclick = () => { if (!actCtx.id || !confirm('Excluir esta atividade?')) return; S.activities = S.activities.filter(a => a.id !== actCtx.id); addLog('excluiu uma atividade'); save(); closeDlg($('#actDlg')); render(); toast('Excluída', 'info'); };
 
   $('#personForm').addEventListener('submit', e => {
     e.preventDefault();
     const F = e.target.elements, name = F.name.value.trim();
     if (!name) { $('#personErr').textContent = 'Qual o nome?'; return; }
     const data = { name, regime: F.regime.value, role: 'designer', email: F.email.value.trim(), color: F.color.value || PALETTE[0], payByPoints: F.payByPoints.checked };
-    if (editingPerson) Object.assign(editingPerson, data); else { if (!designers().length) ui.view = 'equipe'; S.people.push({ id: uid(), ...data }); addLog(`cadastrou ${name}`); }
-    save(); $('#personDlg').close(); render(); toast(editingPerson ? 'Atualizado' : `${firstName(name)} entrou na equipe`);
+    const first = !designers().length;
+    if (editingPerson) Object.assign(editingPerson, data); else { S.people.push({ id: uid(), ...data }); addLog(`cadastrou ${name}`); }
+    save(); closeDlg($('#personDlg'));
+    if (first) { ui.view = 'config'; ui.cfg = 'equipe'; ui.enter = true; }
+    render(); toast(editingPerson ? 'Atualizado' : `${firstName(name)} entrou na equipe`);
+  });
+
+  $('#hoursForm').addEventListener('submit', e => {
+    e.preventDefault();
+    let n = 0;
+    $$('#hGrid input').forEach(i => { const min = parseHM(i.value); if (min <= 24 * 60) { if (min !== onlineMin(hoursCtx.pid, i.dataset.hk)) n++; setOnline(hoursCtx.pid, i.dataset.hk, min); } });
+    if (n) addLog(`lançou horas online de ${firstName(person(hoursCtx.pid).name)} (${n} dia${n > 1 ? 's' : ''})`);
+    save(); closeDlg($('#hoursDlg')); render(); toast('Horas online salvas');
   });
 
   $('#importFile').addEventListener('change', async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-    try { const s = normalize(JSON.parse(await f.text())); if (!confirm('Substituir todos os dados por este arquivo?')) return; S = s; save(); render(); toast('Importado'); } catch (err) { toast('Arquivo inválido'); }
+    try { const s = normalize(JSON.parse(await f.text())); if (!confirm('Substituir todos os dados por este arquivo?')) return; S = s; save(); ui.enter = true; render(); toast('Importado'); } catch (err) { toast('Arquivo inválido', 'warn'); }
   });
-}
 
-function quickPreview() {
-  const f = $('#quickForm'); if (!f) return;
-  const F = f.elements, qty = Math.max(1, parseInt(F.qty.value, 10) || 1);
-  $('#qPts').textContent = fmtPts(suggestedPts(F.type.value, qty));
-  const w = ruleWarnings({ designerId: me().id, type: F.type.value, client: F.client.value, qty, status: 'pendente' });
-  // conta também o que está sendo lançado agora
-  const t = typeOf(F.type.value);
-  let msg = '';
-  if (t.max && F.client.value.trim()) {
-    const used = S.activities.filter(x => x.designerId === me().id && x.type === t.id && x.status !== 'recusada' && norm(x.client) === norm(F.client.value)).reduce((s, x) => s + (x.qty || 1), 0);
-    if (used + qty > t.max) msg = `Atenção: ${t.label.toLowerCase()} tem limite de ${t.max} por cliente (já lançou ${used}). A gestão pode recusar o excedente.`;
+  addEventListener('resize', () => after());
+}
+function hoursCtxTotal(pid) { const { days } = period(); return days.reduce((s, d) => s + onlineMin(pid, dkey(d)), 0); }
+function closeDlg(dl) { if (!dl.open) return; dl.classList.add('closing'); setTimeout(() => { dl.classList.remove('closing'); dl.close(); }, 160); }
+
+function exportCSV() {
+  const { from, to, label } = period();
+  const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [['Designer', 'Regime', 'Data', 'Hora', 'Cliente', 'Nº lulu', 'Atividade', 'Qtd', 'Pontos', 'Status', 'Comentário da gestão', 'Valor (R$)'].join(';')];
+  for (const p of isAdmin() ? designers() : [me()]) {
+    const s = stats(p.id, from, to), rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
+    for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
+      const d = parseKey(a.date);
+      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), a.luluId, q(a.extra ? 'Extra' : typeOf(a.type).label), a.qty, n(a.pts), STATUS[a.status].label, q(a.note), rate != null && a.status === 'aprovada' ? n((a.pts * rate).toFixed(2)) : ''].join(';'));
+    }
   }
-  $('#qWarn').textContent = msg || (w ? 'Atenção: ' + w : '');
+  const el = document.createElement('a');
+  el.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  el.download = `dede-${label.replace(/[^\wÀ-ú]+/g, '-')}.csv`; document.body.appendChild(el); el.click(); el.remove();
+  toast(`Planilha exportada · ${lines.length - 1} linhas`);
 }
 
 function io(kind) {
-  if (kind === 'export') {
-    const el = document.createElement('a');
-    el.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }));
-    el.download = `dede-${dkey(new Date())}.json`; document.body.appendChild(el); el.click(); el.remove();
-    return toast('Exportado');
-  }
+  if (kind === 'export') { const el = document.createElement('a'); el.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' })); el.download = `dede-${dkey(new Date())}.json`; document.body.appendChild(el); el.click(); el.remove(); return toast('Exportado'); }
   if (kind === 'import') return $('#importFile').click();
-  if (kind === 'demo') { if (designers().length && !confirm('Carregar o exemplo substitui os dados atuais. Continuar?')) return; S = demoState(); save(); ui.view = 'atividades'; ui.period = 'semana'; render(); return toast('Exemplo carregado: 3 designers e 2 semanas'); }
-  if (kind === 'reset') { if (!confirm('Zerar tudo? Designers, atividades e horas serão apagados.')) return; S = normalize({ settings: S.settings }); ui.meId = 'adm'; localStorage.setItem('dede.me', 'adm'); save(); render(); return toast('Tudo zerado'); }
+  if (kind === 'demo') { if (designers().length && !confirm('Carregar o exemplo substitui os dados atuais. Continuar?')) return; S = demoState(); save(); ui.view = 'atividades'; ui.period = 'semana'; ui.enter = true; render(); return toast('Exemplo carregado', 'info'); }
+  if (kind === 'reset') { if (!confirm('Zerar tudo? Designers, atividades e horas serão apagados.')) return; S = normalize({ settings: S.settings }); ui.meId = 'adm'; localStorage.setItem('dede.me', 'adm'); save(); ui.enter = true; render(); return toast('Tudo zerado', 'info'); }
 }
 
 window.dede = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
 
-(function init() {
-  S = load() || normalize({});
-  save(); bind(); render();
-})();
+(function init() { S = load() || normalize({}); save(); bind(); render(); })();
