@@ -20,7 +20,8 @@ const fmtDur = min => { min = Math.max(0, Math.round(min)); const h = Math.floor
 const fmtMult = m => `×${fmtNum(m, m % 1 ? (Math.round(m * 100) % 10 ? 2 : 1) : 1)}`;
 
 const ui = {
-  view: 'painel',
+  view: 'designers',
+  sheet: { who: 'all', q: '', sort: 't', dir: -1, closed: {}, limit: {} },
   period: 'semana',
   meId: localStorage.getItem('aba.me') || 'adm',
   day: new Date(),
@@ -32,6 +33,8 @@ const ui = {
   sim: null,
 };
 const I = {
+  designers: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
+  sheet: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
   painel: '<path d="M3 13h8V3H3z"/><path d="M13 21h8V11h-8z"/><path d="M13 3v6h8V3z"/><path d="M3 21h8v-6H3z"/>',
   cards: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   turno: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -94,7 +97,7 @@ const periodSeg = () => `<div class="seg period">${[['hoje', 'hoje'], ['semana',
 /* ---------- shell ---------- */
 function render() {
   if (!person(ui.meId)) ui.meId = me().id;
-  const items = [['painel', 'Painel'], ['cards', 'Cards'], ['turno', 'Turno'], ['pontos', 'Pontuação']];
+  const items = [['designers', 'Designers'], ['painel', 'Painel'], ['cards', 'Cards'], ['turno', 'Turno'], ['pontos', 'Pontuação']];
   if (isAdmin()) items.push(['equipe', 'Equipe']);
   if (!items.some(i => i[0] === ui.view)) ui.view = 'painel';
   $('#nav').innerHTML = items.map(([v, l]) => `<button data-view="${v}" class="${ui.view === v ? 'on' : ''}" title="${l}" aria-label="${l}">${ico(v)}${v === 'cards' ? badgeQueue() : ''}<span class="tip">${l}</span></button>`).join('');
@@ -102,13 +105,13 @@ function render() {
   renderMe();
   document.body.dataset.view = ui.view;
   document.body.classList.toggle('is-admin', isAdmin());
-  const v = { painel: viewPainel, cards: viewCards, turno: viewTurno, pontos: viewPontos, equipe: viewEquipe }[ui.view];
+  const v = { designers: viewDesigners, painel: viewPainel, cards: viewCards, turno: viewTurno, pontos: viewPontos, equipe: viewEquipe }[ui.view];
   $('#main').innerHTML = v();
   tick();
 }
 function titleFor(label) {
   let sub = '';
-  if (ui.view === 'painel') sub = periodRange().label;
+  if (ui.view === 'painel' || ui.view === 'designers') sub = periodRange().label;
   else if (ui.view === 'cards') sub = `${S.cards.filter(c => c.status === 'fazendo').length} em andamento`;
   else if (ui.view === 'turno') sub = `${WDL[ui.day.getDay()]}, ${ui.day.getDate()} de ${MESL[ui.day.getMonth()]}`;
   else if (ui.view === 'pontos') sub = `${S.settings.itemTypes.length} tipos de tarefa`;
@@ -134,6 +137,152 @@ function renderMe() {
     status = `<span class="online-count"><i class="dot"></i>${n} de ${designers().length} online</span>`;
   }
   $('#me').innerHTML = `${status}<label class="whoami" title="Modo demonstração: troque de usuário para ver como cada um enxerga">${avatar(m, 'sm')}<select id="meSel" aria-label="Entrar como">${opts}</select></label>`;
+}
+
+/* ============================================================
+   DESIGNERS — planilha por designer + métricas da gestão
+   ============================================================ */
+function activityRows(pid, from, to) {
+  const map = new Map();
+  for (const c of S.cards) {
+    if (c.designerId !== pid) continue;
+    for (const e of c.entries) {
+      if (e.status !== 'feito' || !e.at) continue;
+      const t = new Date(e.at); if (t < from || t >= to) continue;
+      const key = c.id + '|' + e.type + '|' + Math.floor(t / 60000);
+      let r = map.get(key);
+      if (!r) map.set(key, (r = { card: c, type: e.type, t, qty: 0, pts: 0, round: e.round || 1 }));
+      r.qty++; r.pts += typeOf(e.type).pts;
+    }
+  }
+  return [...map.values()];
+}
+function sheetFilter(rows) {
+  const q = ui.sheet.q.trim().toLowerCase();
+  if (q) rows = rows.filter(r => `${r.card.client} ${r.card.luluId || ''} ${r.card.model} ${typeOf(r.type).label}`.toLowerCase().includes(q));
+  const k = ui.sheet.sort, d = ui.sheet.dir;
+  const key = { t: r => +r.t, client: r => r.card.client.toLowerCase(), type: r => typeOf(r.type).label, pts: r => r.pts }[k] || (r => +r.t);
+  return rows.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * d || (b.t - a.t); });
+}
+const sheetPeople = () => isAdmin() ? (ui.sheet.who === 'all' ? designers() : [person(ui.sheet.who)].filter(Boolean)) : [me()];
+const fmtDay = t => `${WD[t.getDay()]} ${pad(t.getDate())}/${pad(t.getMonth() + 1)}`;
+
+function viewDesigners() {
+  const { from, to, label } = periodRange(), admin = isAdmin();
+  const all = designers().map(p => ({ p, s: stats(p.id, from, to) }));
+  const ppl = sheetPeople();
+  let grand = { n: 0, pts: 0, val: 0 }, rowNo = 0;
+
+  const blocks = ppl.map(p => {
+    const s = stats(p.id, from, to);
+    const rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
+    const rows = sheetFilter(activityRows(p.id, from, to));
+    const pts = rows.reduce((a, r) => a + r.pts, 0), val = rate == null ? null : pts * rate;
+    grand.n += rows.length; grand.pts += pts; grand.val += val || 0;
+    const closed = !!ui.sheet.closed[p.id];
+    const lim = ui.sheet.limit[p.id] || 40;
+    let lastDay = '';
+    const body = rows.slice(0, lim).map(r => {
+      const day = dkey(r.t), newDay = day !== lastDay && ui.sheet.sort === 't'; lastDay = day;
+      const t = typeOf(r.type);
+      return `<tr class="${newDay ? 'newday' : ''}">
+        <td class="rn">${++rowNo}</td>
+        <td class="c-date">${fmtDay(r.t)}</td>
+        <td class="c-time">${hm(r.t)}</td>
+        <td class="c-client"><b>${esc(r.card.client)}</b><small>${r.card.luluId ? `lulu #${esc(r.card.luluId)}` : 'manual'}${r.card.model ? ' · ' + esc(r.card.model) : ''}</small></td>
+        <td class="c-act"><span class="act" style="--tc:${t.color}"><i></i>${esc(t.label)}</span>${r.qty > 1 ? `<em>×${r.qty}</em>` : ''}${r.round > 1 ? `<small>${r.round}ª entrega</small>` : ''}</td>
+        <td class="num">${fmtPts(r.pts)}</td>
+        <td class="num money">${rate == null ? '<span class="muted">—</span>' : fmtBRL(r.pts * rate)}</td>
+      </tr>`;
+    }).join('');
+    const sortBtn = (k, l, cls = '') => `<th class="${cls}"><button data-sort="${k}" class="${ui.sheet.sort === k ? 'on' : ''}">${l}${ui.sheet.sort === k ? (ui.sheet.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`;
+    return `<section class="sheet-block" style="--pc:${p.color}">
+      <header class="sb-head" data-toggle-group="${p.id}">
+        ${avatar(p)}
+        <div class="sb-name"><b>${esc(p.name)}</b><span>${p.regime}${isOnlineNow(p.id) ? ' · <i class="on-dot"></i>online agora' : ''}</span></div>
+        <div class="sb-stats">
+          <span><small>clientes</small><b>${new Set(rows.map(r => r.card.id)).size}</b></span>
+          <span><small>atividades</small><b>${rows.length}</b></span>
+          <span><small>pontos</small><b>${fmtPts(pts)}</b></span>
+          <span><small>online</small><b>${fmtDur(s.minutes)}</b></span>
+          <span><small>bônus</small><b>${fmtMult(s.mult)}</b></span>
+          <span class="sb-pay"><small>valor</small><b>${val == null ? 'fixo' : fmtBRL(val)}</b></span>
+        </div>
+        <span class="sb-chev ${closed ? '' : 'open'}">⌄</span>
+      </header>
+      ${closed ? '' : `<div class="sheet-wrap"><table class="sheet">
+        <thead><tr><th class="rn">#</th>${sortBtn('t', 'Data')}<th>Hora</th>${sortBtn('client', 'Card (cliente)')}${sortBtn('type', 'Atividade')}${sortBtn('pts', 'Pontos', 'num')}<th class="num">Valor</th></tr></thead>
+        <tbody>${body || `<tr><td colspan="7" class="empty-row">Nenhuma atividade ${ui.sheet.q ? 'com essa busca' : 'no período'}.</td></tr>`}</tbody>
+        ${rows.length ? `<tfoot><tr><td></td><td colspan="4">Total de ${esc(firstName(p.name))} · ${rows.length} atividades${rate != null ? ` · ponto a ${fmtBRL(rate)} (${fmtBRL(S.settings.pointValue)} × ${fmtNum(s.mult, 2)})` : ''}</td><td class="num">${fmtPts(pts)}</td><td class="num money">${val == null ? '—' : fmtBRL(val)}</td></tr></tfoot>` : ''}
+      </table></div>
+      ${rows.length > lim ? `<div class="sheet-more"><button class="ghost sm" data-more-rows="${p.id}">mostrar mais ${Math.min(100, rows.length - lim)} de ${rows.length - lim} restantes</button></div>` : ''}`}
+    </section>`;
+  }).join('');
+
+  const whoSel = admin ? `<select class="pill-select" data-sheet-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.sheet.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>` : '';
+
+  return `<section class="page">
+    <div class="page-head">
+      <button class="solid big" data-export-csv>${ico('sheet')}Exportar planilha</button><span class="vsep"></span>
+      ${periodTabs()}
+    </div>
+    ${admin ? metricsArea(all) : ''}
+    <div class="sheet-toolbar">
+      <h2>Atividades por designer</h2>
+      <span class="sp"></span>
+      ${whoSel}
+      <input class="search" type="search" placeholder="buscar cliente, nº lulu, atividade…" value="${esc(ui.sheet.q)}" data-sheet-q>
+      ${ppl.length > 1 ? `<button class="ghost sm" data-toggle-all>${ppl.every(p => ui.sheet.closed[p.id]) ? 'abrir todos' : 'recolher todos'}</button>` : ''}
+    </div>
+    ${blocks}
+    ${ppl.length > 1 ? `<div class="grand"><span>Total geral · ${esc(label)}</span><span>${grand.n} atividades</span><span>${fmtPts(grand.pts)} pts</span><b>${fmtBRL(grand.val)}</b></div>` : ''}
+  </section>`;
+}
+
+function metricsArea(all) {
+  const tot = all.reduce((t, { s }) => ({ pay: t.pay + (s.pay || 0), pts: t.pts + s.points, cards: t.cards + s.cards, min: t.min + s.minutes }), { pay: 0, pts: 0, cards: 0, min: 0 });
+  const lb = (title, sub, key, fmt) => {
+    const list = [...all].sort((a, b) => key(b.s) - key(a.s));
+    const max = Math.max(1e-9, ...list.map(x => key(x.s)));
+    return `<div class="card lb">
+      ${cardHead(title, sub)}
+      <ol>${list.map(({ p, s }, i) => `<li class="${i === 0 ? 'first' : ''}">
+        <span class="lb-pos">${i + 1}</span>${avatar(p, 'sm')}
+        <span class="lb-name">${esc(firstName(p.name))}</span>
+        <span class="lb-bar"><i style="width:${key(s) / max * 100}%;background:${p.color}"></i></span>
+        <b>${fmt(s)}</b></li>`).join('')}</ol>
+    </div>`;
+  };
+  return `<div class="kpis">
+      ${kpi('gasto no período', fmtBRL(tot.pay), `${fmtBRL(tot.cards ? tot.pay / tot.cards : 0)} por cliente`, 'ink')}
+      ${kpi('clientes atendidos', tot.cards, `${fmtPts(tot.pts)} pontos no total`)}
+      ${kpi('tempo online do time', fmtDur(tot.min), `${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h por designer`)}
+      ${kpi('custo por ponto', fmtBRL(tot.pts ? tot.pay / tot.pts : 0), `base ${fmtBRL(S.settings.pointValue)} + bônus`)}
+    </div>
+    <div class="lb-grid">
+      ${lb('Mais tempo online', 'horas no período', s => s.minutes, s => fmtDur(s.minutes))}
+      ${lb('Mais cards', 'clientes atendidos', s => s.cards, s => `${s.cards}`)}
+      ${lb('Gasto por designer', 'quanto cada um recebe', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay))}
+      ${lb('Mais pontos por cliente', 'qualidade da entrega', s => s.ptsPerCard, s => fmtNum(s.ptsPerCard))}
+    </div>`;
+}
+
+function exportCSV() {
+  const { from, to, label } = periodRange();
+  const n = v => String(v).replace('.', ',');
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [['Designer', 'Regime', 'Data', 'Hora', 'Cliente', 'Nº lulu', 'Modelo', 'Atividade', 'Qtd', 'Entrega', 'Pontos', 'Valor (R$)'].join(';')];
+  for (const p of sheetPeople()) {
+    const s = stats(p.id, from, to), rate = p.payByPoints ? S.settings.pointValue * s.mult : null;
+    for (const r of sheetFilter(activityRows(p.id, from, to))) {
+      lines.push([q(p.name), p.regime, `${pad(r.t.getDate())}/${pad(r.t.getMonth() + 1)}/${r.t.getFullYear()}`, hm(r.t), q(r.card.client), r.card.luluId || '', q(r.card.model), q(typeOf(r.type).label), r.qty, `${r.round}ª`, n(r.pts), rate == null ? '' : n((r.pts * rate).toFixed(2))].join(';'));
+    }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = `aba-designers-${label.replace(/[^\wÀ-ú]+/g, '-')}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast(`Planilha exportada · ${lines.length - 1} linhas`);
 }
 
 /* ============================================================
@@ -765,6 +914,11 @@ function bind() {
     if (t.closest('dialog')) return;
     if ((el = t.closest('#nav [data-view]'))) { ui.view = el.dataset.view; render(); scrollTo(0, 0); return; }
     if ((el = t.closest('[data-go]'))) { ui.view = el.dataset.go; render(); scrollTo(0, 0); return; }
+    if ((el = t.closest('[data-sort]'))) { const k = el.dataset.sort; if (ui.sheet.sort === k) ui.sheet.dir *= -1; else { ui.sheet.sort = k; ui.sheet.dir = k === 'client' || k === 'type' ? 1 : -1; } render(); return; }
+    if ((el = t.closest('[data-toggle-group]'))) { const id = el.dataset.toggleGroup; ui.sheet.closed[id] = !ui.sheet.closed[id]; render(); return; }
+    if (t.closest('[data-toggle-all]')) { const ppl = sheetPeople(); const close = !ppl.every(p => ui.sheet.closed[p.id]); ppl.forEach(p => { ui.sheet.closed[p.id] = close; }); render(); return; }
+    if ((el = t.closest('[data-more-rows]'))) { const id = el.dataset.moreRows; ui.sheet.limit[id] = (ui.sheet.limit[id] || 40) + 100; render(); return; }
+    if (t.closest('[data-export-csv]')) { exportCSV(); return; }
     if ((el = t.closest('[data-period]'))) { ui.period = el.dataset.period; render(); return; }
     if ((el = t.closest('[data-online-self]'))) {
       const m = me();
@@ -867,6 +1021,7 @@ function bind() {
       if (t.checked) goOnline(id, 'admin'); else goOffline(id, 'admin');
       save(); render(); toast(`${firstName(person(id).name)} ${t.checked ? 'ligado(a)' : 'desligado(a)'} pela gestão`); return;
     }
+    if (t.matches('[data-sheet-who]')) { ui.sheet.who = t.value; render(); return; }
     if (t.matches('[data-cardwho]')) { ui.cardWho = t.value; render(); return; }
     if (t.matches('[data-assign]')) {
       const c = findCard(t); if (!c || !t.value) return;
@@ -891,6 +1046,11 @@ function bind() {
   });
 
   document.addEventListener('input', e => {
+    if (e.target.matches('[data-sheet-q]')) {
+      ui.sheet.q = e.target.value; const pos = e.target.selectionStart;
+      render(); const s = $('[data-sheet-q]'); if (s) { s.focus(); s.setSelectionRange(pos, pos); }
+      return;
+    }
     if (e.target.matches('[data-search]')) {
       ui.q = e.target.value; const pos = e.target.selectionStart;
       render(); const s = $('[data-search]'); if (s) { s.focus(); s.setSelectionRange(pos, pos); }
