@@ -801,3 +801,74 @@ fieldset[disabled] .stepper-n button,fieldset[disabled] .qt{display:none}
 .grid-2 .clr-dot{margin:0 4px}
 .pt-label{min-width:0;width:100%;text-overflow:ellipsis}
 .rc-ovr input::placeholder{color:#C4B48A;font-weight:500}
+
+/* ===== v3.1 · lançar card em janela ===== */
+.filters .search{flex:0 1 260px;min-width:0}
+.filters .search input{width:100%}
+.new-card{height:42px;padding:0 16px 0 14px;font-weight:700}
+.new-card kbd{font:600 11px/1 var(--font);padding:3px 6px;border-radius:6px;background:rgba(24,24,27,.1);color:rgba(24,24,27,.6);margin-left:2px}
+kbd{font-family:var(--font)}
+.fab{display:none}
+
+/* formulário em 3 blocos */
+.cp-fields{gap:0!important;padding:0!important}
+.cf-group{display:flex;flex-direction:column;gap:12px;padding:16px 18px 18px;border-top:1px solid var(--line)}
+.cf-group:first-child{border-top:0}
+.cf-h{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.cf-h b{width:22px;height:22px;border-radius:7px;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:11.5px;font-weight:700}
+.cf-row.r-main{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+.cf-row.r-main input{height:46px;font-size:15px;font-weight:600}
+.cf-row.r-meta{grid-template-columns:150px 120px minmax(0,1fr)}
+.cf-row.r-meta.adm{grid-template-columns:minmax(0,1.2fr) 150px 120px minmax(0,1fr)}
+.f span em{font-style:normal;font-weight:500;color:var(--muted);margin-left:4px}
+
+/* janela */
+#actDlg.wide{width:min(1080px,96vw)}
+#actForm{padding:0;gap:0}
+#actForm>header{position:sticky;top:0;z-index:3;padding:18px 22px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+#actForm>.dlg-hint{margin:12px 22px 0}
+#actForm>fieldset.cp-grid.dlg{margin:16px 22px 0}
+#actForm>.adm-box{margin:12px 22px 0}
+#actForm>.err{margin:8px 22px 0}
+#actForm>footer{position:sticky;bottom:0;z-index:3;margin:14px 0 0;padding:14px 22px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+.dlg-title{display:flex;align-items:center;gap:12px}
+.dlg-title .q-ico{width:36px;height:36px;border-radius:12px}
+.dlg-title .q-ico .ico{width:19px;height:19px}
+.dlg-title p{margin:2px 0 0;font-size:12.5px;color:var(--ink-3)}
+.k-hint{font-size:12px;color:var(--muted)}
+.k-hint kbd{font:600 11px/1 var(--font);padding:3px 6px;border-radius:6px;background:var(--bg-2,#F4F4F5);border:1px solid var(--line-2);color:var(--ink-3);margin-right:4px}
+fieldset.cp-grid.dlg{overflow:clip;background:linear-gradient(90deg,#fff calc(100% - 270px),var(--brand-line) calc(100% - 270px),var(--brand-line) calc(100% - 269px),#FFF8E1 calc(100% - 269px))}
+fieldset.cp-grid.dlg .receipt{position:sticky;top:78px;align-self:start;background:none;border-left:0}
+fieldset.cp-grid.dlg .cp-fields{padding:0!important}
+
+@media (max-width:1100px){
+  .cf-row.r-meta,.cf-row.r-meta.adm{grid-template-columns:1fr 1fr}
+}
+@media (max-width:860px){
+  .new-card{display:none}
+  .fab{display:grid;place-items:center;position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;width:58px;height:58px;border-radius:20px;background:var(--brand);color:var(--ink);border:1px solid var(--brand-2);box-shadow:0 16px 30px -12px rgba(245,168,0,.9),0 4px 10px rgba(0,0,0,.12);transition:transform .25s var(--spring)}
+  .fab:active{transform:scale(.92)}
+  .fab .ico{width:24px;height:24px;stroke-width:2.2}
+  .filters .search{flex:1 1 auto}
+  .cf-row.r-main{grid-template-columns:1fr}
+  #actForm>header,#actForm>footer{padding:14px 16px}
+  #actForm>fieldset.cp-grid.dlg{margin:12px 12px 0}
+  .k-hint{display:none}
+  #actForm>footer{flex-wrap:wrap}
+  #actForm>footer .btn{flex:1}
+  #actForm>footer .sp{display:none}
+}
+.topctl{display:flex;align-items:center;gap:10px}
+.topctl .new-card{height:44px;padding:0 18px 0 15px}
+.filters .search{flex:0 1 300px}
+@media (max-width:860px){ .topctl .new-card{display:none} }
+@media (max-width:1100px){
+  fieldset.cp-grid.dlg{background:#fff}
+  fieldset.cp-grid.dlg .receipt{position:static;background:linear-gradient(180deg,#FFFCF2,#FFF7DB);border-top:1px solid var(--brand-line)}
+}
+@media (max-width:860px){
+  #actForm>footer [data-close]{display:none}
+  #actForm>footer .btn{padding:11px 12px;font-size:13px}
+  .dlg-title .q-ico{display:none}
+}
+@media (max-width:860px){ .filters .search{flex:1 1 100%} }
