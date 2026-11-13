@@ -25,10 +25,10 @@ const toHM = min => min ? `${Math.floor(min / 60)}:${pad(Math.round(min % 60))}`
 const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
 
 const STATUS = {
-  pendente: { label: 'Aguardando', cls: 'st-pend' },
-  aprovada: { label: 'Aprovada', cls: 'st-ok' },
-  erro: { label: 'Corrigir', cls: 'st-err' },
-  recusada: { label: 'Recusada', cls: 'st-no' },
+  pendente: { label: 'Em revisão', cls: 'st-pend' },
+  aprovada: { label: 'Validado', cls: 'st-ok' },
+  erro: { label: 'Ajuste solicitado', cls: 'st-err' },
+  recusada: { label: 'Reprovado', cls: 'st-no' },
 };
 
 const ui = {
@@ -102,7 +102,7 @@ function render() {
   const titles = { atividades: 'Atividades', ranking: 'Ranking', metricas: 'Métricas', config: 'Configurações' };
   const sub = ui.view === 'config' ? 'só a gestão vê' : ui.view === 'ranking' ? rankLabel() : period().label;
   $('#title').innerHTML = `<h1>${titles[ui.view]}</h1><span>${esc(sub)}</span>`;
-  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : ui.view === 'ranking' ? `<div class="period-ctl"><div class="stepper"><button class="icon-btn" data-rshift="-1" aria-label="semana anterior">${ico('left')}</button><button class="today-btn" data-rshift="0">Esta semana</button><button class="icon-btn" data-rshift="1" aria-label="próxima semana">${ico('right')}</button></div></div>` : periodCtl() + (ui.view === 'atividades' && designers().length ? `<button class="btn brand new-card" data-new-card data-tip="atalho: N">${ico('plus')}Lançar card</button>` : '');
+  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : ui.view === 'ranking' ? `<div class="period-ctl"><div class="stepper"><button class="icon-btn" data-rshift="-1" aria-label="semana anterior">${ico('left')}</button><button class="today-btn" data-rshift="0">Esta semana</button><button class="icon-btn" data-rshift="1" aria-label="próxima semana">${ico('right')}</button></div></div>` : periodCtl() + (ui.view === 'atividades' && designers().length ? `<button class="btn brand new-card" data-new-card data-tip="atalho: N">${ico('plus')}Registrar card</button>` : '');
   renderMe();
   const html = ({ atividades: viewAtividades, ranking: viewRanking, metricas: viewMetricas, config: viewConfig })[ui.view]();
   const main = $('#main');
@@ -124,7 +124,7 @@ function slide(el, key, x, w, prop) {
 function after() {
   const on = $('#nav button.on'), ind = $('.rail-ind');
   if (on && ind) slide(ind, 'nav', on.offsetTop, on.offsetHeight, 'y');
-  $$('.seg').forEach(sg => { const b = sg.querySelector('button.on'), t = sg.querySelector('.thumb'); if (b && t) slide(t, 'seg-' + sg.dataset.seg, b.offsetLeft - 4, b.offsetWidth, 'x'); else if (t) t.style.opacity = 0; });
+  $$('.seg').forEach(sg => { const b = sg.querySelector('button.on'), t = sg.querySelector('.thumb'); if (b && t) slide(t, 'seg-' + sg.dataset.seg, b.offsetLeft - 3, b.offsetWidth, 'x'); else if (t) t.style.opacity = 0; });
   if (ui.enter) countUp();
   ui.enter = false; ui.flash = {};
 }
@@ -161,13 +161,13 @@ function viewAtividades() {
   return `<section class="page">
     ${summary(ppl, from, to)}
     <div class="filters">
-      ${seg('status', [['todas', 'Todos', cnt('todas')], ['pendente', 'Aguardando', cnt('pendente')], ['aprovada', 'Aprovados', cnt('aprovada')], ['erro', 'Corrigir', cnt('erro')], ['recusada', 'Recusados', cnt('recusada')]], ui.status)}
+      ${seg('status', [['todas', 'Todos', cnt('todas')], ['pendente', 'Em revisão', cnt('pendente')], ['aprovada', 'Validados', cnt('aprovada')], ['erro', 'Ajustes', cnt('erro')], ['recusada', 'Reprovados', cnt('recusada')]], ui.status)}
       <span class="sp"></span>
       ${isAdmin() ? `<label class="select-pill">${ico('users')}<select data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${ico('chev')}</label>` : ''}
       <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, nº lulu…" value="${esc(ui.q)}" data-q></label>
     </div>
     ${ppl.map((p, i) => block(p, from, to, i)).join('')}
-    <button class="fab" data-new-card aria-label="Lançar card">${ico('plus')}</button>
+    <button class="fab" data-new-card aria-label="Registrar card">${ico('plus')}</button>
   </section>`;
 }
 
@@ -191,18 +191,18 @@ function summary(ppl, from, to) {
   if (one) {
     const b = one.s.buff;
     buffCell = b.eligible
-      ? `<div class="sm-buff m${String(b.mult).replace('.', '')}"><span>${ico('bolt')} Buff de ${MONTHL(parseKey(to))}</span><b>${fmtMult(b.mult)}</b><small>${fmtNum(b.avgH)}h/dia${b.next ? ` · faltam ${fmtNum(b.next.h - b.avgH)}h p/ ${fmtMult(b.next.mult)}` : ' · máximo'}</small></div>`
-      : `<div class="sm-buff"><span>${ico('bolt')} Buff</span><b>—</b><small>só para PJ</small></div>`;
+      ? `<div class="sm-buff m${String(b.mult).replace('.', '')}"><span>Buff · ${MONTHL(parseKey(to))}</span><b>${fmtMult(b.mult)}</b><small>média ${fmtNum(b.avgH)}h/dia${b.next ? ` · +${fmtNum(b.next.h - b.avgH)}h p/ ${fmtMult(b.next.mult)}` : ' · faixa máxima'}</small></div>`
+      : `<div class="sm-buff"><span>Buff</span><b>—</b><small>aplicável apenas a PJ</small></div>`;
   } else {
     const pj = st.filter(x => x.s.buff.eligible), on = pj.filter(x => x.s.buff.mult > 1).length;
-    buffCell = `<div class="sm-buff"><span>${ico('bolt')} Buff ativo</span><b>${on}<i>/${pj.length}</i></b><small>PJs com buff no mês</small></div>`;
+    buffCell = `<div class="sm-buff"><span>Buff ativo</span><b>${on}<i>/ ${pj.length}</i></b><small>PJs com multiplicador no mês</small></div>`;
   }
   return `<div class="summary">
-    <div class="sm-main"><span>${who} · pontos aprovados</span><b>${num(t.pts)}</b><small>${plural(t.cards, 'card aprovado', 'cards aprovados')}</small></div>
-    <div><span>Aguardando aprovação</span><b>${num(t.pendPts)}</b><small>${plural(t.pend, 'card', 'cards')}</small></div>
-    <div><span>Tempo online</span><b>${num(t.min, 'dur')}</b><small>${one ? 'no período' : 'soma do time'}</small></div>
+    <div class="sm-main"><span>Pontuação validada${admin ? ` · ${esc(who)}` : ''}</span><b>${num(t.pts)}<i>pts</i></b><small>${plural(t.cards, 'card validado', 'cards validados')}</small></div>
+    <div><span>Em revisão</span><b>${num(t.pendPts)}<i>pts</i></b><small>${plural(t.pend, 'card pendente', 'cards pendentes')}</small></div>
+    <div><span>Horas registradas</span><b>${num(t.min, 'dur')}</b><small>${one ? 'no período' : 'total da equipe'}</small></div>
     ${buffCell}
-    <div class="sm-pay"><span>${admin && !one ? 'A pagar' : 'A receber'}</span><b>${num(t.pay, 'brl')}</b><small>aprovados × ${fmtBRL(S.settings.pointValue)}${one && one.s.buff.mult > 1 ? ' × buff' : ''}</small></div>
+    <div class="sm-pay"><span>${admin && !one ? 'Custo previsto' : 'Remuneração prevista'}</span><b>${num(t.pay, 'brl')}</b><small>pts validados × ${fmtBRL(S.settings.pointValue)}${one && one.s.buff.mult > 1 ? ' × buff' : ''}</small></div>
   </div>`;
 }
 
@@ -213,7 +213,7 @@ function cardFields(c, opts = {}) {
   const admin = isAdmin(), st = S.settings;
   return `
     <div class="cf-group">
-    <div class="cf-h"><b>1</b>Qual card</div>
+    <div class="cf-h"><b>1</b>Identificação</div>
     <div class="cf-row r-main">
       <label class="f"><span>Cliente</span><input name="client" value="${esc(c.client)}" placeholder="Nome do cliente" list="clientList" autocomplete="off"></label>
       <label class="f"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Trucker evento verão" autocomplete="off"></label>
@@ -226,37 +226,37 @@ function cardFields(c, opts = {}) {
     </div>
     </div>
     <div class="cf-group">
-    <div class="cf-h"><b>2</b>O que foi feito</div>
+    <div class="cf-h"><b>2</b>Escopo</div>
     <div class="cf-sec">
       <div class="cf-lbl">Tipo de atividade</div>
       <div class="tiles">${st.kinds.map(k => `<label class="tile" style="--tc:${k.color}" title="${esc(k.hint || '')}"><input type="radio" name="kind" value="${k.id}" ${c.kind === k.id ? 'checked' : ''}><span><i></i><b>${esc(k.label)}</b><em>${fmtPts(k.pts)} pt${k.pts === 1 ? '' : 's'}</em></span></label>`).join('')}</div>
     </div>
     <div class="cf-two">
       <div class="cf-sec">
-        <div class="cf-lbl">Logo recebida</div>
+        <div class="cf-lbl">Arquivo de logo recebido</div>
         <div class="pills">${st.logoQ.map(q => `<label class="pill"><input type="radio" name="logoQ" value="${q.id}" ${c.logoQ === q.id ? 'checked' : ''}><span>${esc(q.label)}${q.pts ? `<em>+${fmtPts(q.pts)}</em>` : ''}</span></label>`).join('')}</div>
       </div>
       <div class="cf-sec">
-        <div class="cf-lbl">Adicionais</div>
+        <div class="cf-lbl">Itens adicionais</div>
         <div class="steps">${st.adds.map(ad => `<div class="step"><span>${esc(ad.label)}<em>+${fmtPts(ad.pts)} cada</em></span><div class="stepper-n"><button type="button" data-step="${ad.id}|-1" aria-label="menos">−</button><input name="add_${ad.id}" value="${(c.adds && c.adds[ad.id]) || 0}" inputmode="numeric"><button type="button" data-step="${ad.id}|1" aria-label="mais">+</button></div></div>`).join('')}</div>
       </div>
     </div>
     </div>
     <div class="cf-group">
-    <div class="cf-h"><b>3</b>Como foi</div>
+    <div class="cf-h"><b>3</b>Execução</div>
     <div class="cf-two">
       <div class="cf-sec">
-        <div class="cf-lbl">Dificuldade do card</div>
+        <div class="cf-lbl">Complexidade</div>
         <div class="pills diffs">${st.diffs.map(d => `<label class="pill diff" style="--dc:${d.color}"><input type="radio" name="diff" value="${d.id}" ${c.diff === d.id ? 'checked' : ''}><span><i></i>${esc(d.label)}</span></label>`).join('')}</div>
       </div>
       <div class="cf-sec">
-        <div class="cf-lbl">Tempo neste card</div>
+        <div class="cf-lbl">Tempo de execução</div>
         <div class="time-row"><label class="f t-in">${ico('timer')}<input name="mins" value="${toHM(c.mins)}" placeholder="0:45" inputmode="decimal"></label>
           ${[15, 30, 45, 60, 90, 120].map(m => `<button type="button" class="qt" data-qt="${m}">${m < 60 ? m + 'min' : fmtDur(m).replace('h00', 'h')}</button>`).join('')}</div>
       </div>
     </div>
     <div class="cf-sec">
-      <div class="cf-lbl">Detalhes da pontuação <span>opcional</span></div>
+      <div class="cf-lbl">Justificativa da pontuação <span>opcional</span></div>
       <textarea name="details" rows="2" placeholder="ex.: não fiz modificações na logo, mas refiz os layouts do zero">${esc(c.details || '')}</textarea>
     </div>
     </div>`;
@@ -265,11 +265,11 @@ function receipt(c, opts = {}) {
   const sc = scoreOf(c), admin = isAdmin();
   const pts = opts.override != null ? opts.override : sc.total;
   return `<aside class="receipt">
-    <div class="rc-head">${ico('star')}<b>Pontuação</b></div>
+    <div class="rc-head"><b>Memória de cálculo</b></div>
     <ul class="rc-lines">${sc.lines.map(l => `<li><span>${esc(l.label)}</span><b>${l.pts > 0 && sc.lines[0] !== l ? '+' : ''}${fmtPts(l.pts)}</b></li>`).join('')}</ul>
     <div class="rc-total"><span>Total</span><b class="rc-pts">${fmtPts(pts)}</b><small>pts</small></div>
-    ${admin ? `<label class="rc-ovr"><span>Ajustar pontos</span><input name="ptsOverride" value="${opts.override != null ? opts.override : ''}" placeholder="${fmtPts(sc.total)}" inputmode="decimal"></label>` : ''}
-    <div class="rc-val">≈ ${fmtBRL(pts * S.settings.pointValue)}<small>antes do buff</small></div>
+    ${admin ? `<label class="rc-ovr"><span>Ajuste manual</span><input name="ptsOverride" value="${opts.override != null ? opts.override : ''}" placeholder="${fmtPts(sc.total)}" inputmode="decimal"></label>` : ''}
+    <div class="rc-val">≈ ${fmtBRL(pts * S.settings.pointValue)}<small>valor bruto, sem buff</small></div>
     ${opts.submit || ''}
   </aside>`;
 }
@@ -286,11 +286,11 @@ function openNew() {
   const c = ui.draft && ui.draft.designerId === did ? ui.draft : emptyCard(did);
   actCtx = { mode: 'new' };
   $('#actForm').innerHTML = `
-    <header><div class="dlg-title"><span class="q-ico">${ico('plus')}</span><div><h2>Lançar card</h2><p>${admin ? 'Lançado pela gestão já entra aprovado.' : 'Vai para a gestão aprovar. Os pontos aparecem calculados ao lado.'}</p></div></div><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
+    <header><div class="dlg-title"><span class="q-ico">${ico('plus')}</span><div><h2>Registrar card</h2><p>${admin ? 'Registros feitos pela gestão entram validados.' : 'O registro segue para validação da gestão. A pontuação é calculada automaticamente.'}</p></div></div><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
     <fieldset class="cp-grid dlg"><div class="cp-fields">${cardFields(c)}</div>${receipt(c)}</fieldset>
     <datalist id="clientList">${clientOpts(did)}</datalist>
     <p class="err" id="actErr" role="alert"></p>
-    <footer><span class="k-hint"><kbd>Esc</kbd> fecha</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">${ico('plus')}Lançar card</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Lançar e fazer outro</button></footer>`;
+    <footer><span class="k-hint"><kbd>Esc</kbd> fecha</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button></footer>`;
   const dl = $('#actDlg'); if (!dl.open) dl.showModal();
   $('#actForm').scrollTop = 0;
   $('#actForm').elements.client.focus();
@@ -315,7 +315,7 @@ function refreshReceipt(form) {
   rc.querySelector('.rc-lines').innerHTML = sc.lines.map((l, i) => `<li><span>${esc(l.label)}</span><b>${i ? '+' : ''}${fmtPts(l.pts)}</b></li>`).join('');
   const el = rc.querySelector('.rc-pts');
   if (el.textContent !== fmtPts(pts)) { el.textContent = fmtPts(pts); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
-  rc.querySelector('.rc-val').innerHTML = `≈ ${fmtBRL(pts * S.settings.pointValue)}<small>antes do buff</small>`;
+  rc.querySelector('.rc-val').innerHTML = `≈ ${fmtBRL(pts * S.settings.pointValue)}<small>valor bruto, sem buff</small>`;
   const ov = form.elements.ptsOverride; if (ov) ov.placeholder = fmtPts(sc.total);
   if (actCtx && actCtx.mode === 'new') ui.draft = c;
 }
@@ -341,20 +341,19 @@ function block(p, from, to, idx) {
       <div class="b-name"><b>${esc(p.name)}</b><span>${p.regime}${p.email ? ' · ' + esc(p.email) : ''}</span></div>
       <div class="b-chips">
         <span class="chip"><small>Cards</small><b>${s.cards}</b></span>
-        <span class="chip"><small>Aprovados</small><b>${fmtPts(s.points)}</b></span>
-        ${pendN ? `<span class="chip warn"><small>Aguardando</small><b>${pendN}</b></span>` : ''}
-        <${admin ? 'button' : 'span'} class="chip ${admin ? 'edit' : ''}" ${admin ? `data-hours="${p.id}" data-tip="Lançar horas online"` : ''}><small>Online</small><b>${fmtDur(s.minutes)}</b>${admin ? ico('clock', 'mini') : ''}</${admin ? 'button' : 'span'}>
+        <span class="chip"><small>Validados</small><b>${fmtPts(s.points)}</b></span>
+        ${pendN ? `<span class="chip warn"><small>Em revisão</small><b>${pendN}</b></span>` : ''}
+        <${admin ? 'button' : 'span'} class="chip ${admin ? 'edit' : ''}" ${admin ? `data-hours="${p.id}" data-tip="Registrar horas"` : ''}><small>Horas</small><b>${fmtDur(s.minutes)}</b>${admin ? ico('clock', 'mini') : ''}</${admin ? 'button' : 'span'}>
         <span class="chip buff m${String(b.mult).replace('.', '')}" ${b.eligible ? `data-tip="${fmtNum(b.avgH)}h/dia em ${MONTHL(parseKey(to))}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>
-        <span class="chip dark"><small>A receber</small><b>${s.pay == null ? 'fixo' : fmtBRL(s.pay)}</b></span>
       </div>
-      ${admin && pendN ? `<button class="btn ok sm" data-approve-all="${p.id}">${ico('check')}Aprovar ${pendN}</button>` : ''}
+      ${admin && pendN ? `<button class="btn ok sm" data-approve-all="${p.id}">${ico('check')}Validar ${pendN}</button>` : ''}
       ${one ? '' : `<span class="b-chev">${ico('chev')}</span>`}
     </header>
     <div class="b-body"><div class="b-inner">
       <div class="cards">
-        <div class="ch"><span>Quando</span><span>Cliente · card</span><span>Atividade</span><span>Dificuldade</span><span class="num">Pontos</span><span class="num">Valor</span><span>Status</span><span></span></div>
-        ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nada com esse filtro.' : p.id === m.id ? 'Nenhum card ainda. Clique em <b>Lançar card</b> para começar.' : 'Nenhum card neste período.'}</span></div>`}
-        ${rows.length ? `<div class="cards-foot"><span>${plural(rows.length, 'card', 'cards')}${rate != null ? ` · ponto a ${fmtBRL(rate)}${b.mult > 1 ? ` · buff ${fmtMult(b.mult)} no fechamento` : ''}` : ''}</span><b>${fmtPts(okPts)} pts aprovados</b><b>${rate == null ? '—' : fmtBRL(okPts * rate * b.mult)}</b></div>` : ''}
+        <div class="ch"><span>Data</span><span>Cliente · card</span><span>Tipo</span><span>Complexidade</span><span class="num">Pts</span><span class="num">Valor</span><span>Status</span><span></span></div>
+        ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nenhum resultado para este filtro.' : p.id === m.id ? 'Nenhum registro ainda. Use <b>Registrar card</b> para começar.' : 'Sem registros no período.'}</span></div>`}
+        ${rows.length ? `<div class="cards-foot"><span>${plural(rows.length, 'registro', 'registros')}${rate != null ? ` · ${fmtBRL(rate)}/pt${b.mult > 1 ? ` · buff ${fmtMult(b.mult)} aplicado no fechamento` : ''}` : ''}</span><b>${fmtPts(okPts)} pts validados</b></div>` : ''}
       </div>
       ${rest > 0 ? `<div class="more"><button class="btn line sm" data-more="${p.id}">Mostrar mais ${Math.min(50, rest)} <span class="muted">de ${rest}</span></button></div>` : ''}
     </div></div>
@@ -370,11 +369,11 @@ function cardRow(a, i, rate, admin, m) {
   let actions = '';
   if (admin) {
     actions = `<span class="ab-more">
-      ${a.status !== 'erro' ? `<button class="ab warn" data-mark="${a.id}|erro" data-tip="Pedir correção">${ico('alert')}</button>` : ''}
-      ${a.status !== 'recusada' ? `<button class="ab no" data-mark="${a.id}|recusada" data-tip="Recusar">${ico('x')}</button>` : ''}
-      <button class="ab" data-edit-act="${a.id}" data-tip="Editar">${ico('edit')}</button></span>${a.status !== 'aprovada' ? `<button class="ab ok" data-approve="${a.id}" data-tip="Aprovar">${ico('check')}</button>` : '<span class="ab-gap"></span>'}`;
+      ${a.status !== 'erro' ? `<button class="ab warn" data-mark="${a.id}|erro" data-tip="Solicitar ajuste">${ico('alert')}</button>` : ''}
+      ${a.status !== 'recusada' ? `<button class="ab no" data-mark="${a.id}|recusada" data-tip="Reprovar">${ico('x')}</button>` : ''}
+      <button class="ab" data-edit-act="${a.id}" data-tip="Editar">${ico('edit')}</button></span>${a.status !== 'aprovada' ? `<button class="ab ok" data-approve="${a.id}" data-tip="Validar">${ico('check')}</button>` : '<span class="ab-gap"></span>'}`;
   } else if (canEdit) {
-    actions = `<span class="ab-more show"><button class="ab" data-edit-act="${a.id}" data-tip="${a.status === 'erro' ? 'Corrigir' : 'Editar'}">${ico('edit')}</button><button class="ab no" data-del-act="${a.id}" data-tip="Excluir">${ico('trash')}</button></span>`;
+    actions = `<span class="ab-more show"><button class="ab" data-edit-act="${a.id}" data-tip="${a.status === 'erro' ? 'Ajustar' : 'Editar'}">${ico('edit')}</button><button class="ab no" data-del-act="${a.id}" data-tip="Excluir">${ico('trash')}</button></span>`;
   } else actions = `<span class="ab-more show"><button class="ab" data-view-act="${a.id}" data-tip="Ver detalhes">${ico('note')}</button></span>`;
   const flash = ui.flash[a.id] ? `flash-${ui.flash[a.id]}` : '';
   return `<div class="crow r-${a.status} ${flash}" style="--dc:${d.color};--i:${Math.min(i, 14)}">
@@ -401,8 +400,8 @@ function viewRanking() {
   const month = designers().map(p => ({ p, s: stats(p.id, dkey(mFrom), dkey(mTo)) })).map(x => ({ ...x, score: round2(x.s.points * x.s.buff.mult) })).sort((a, b) => b.score - a.score);
   return `<section class="page">
     <div class="rank-grid">
-      ${board('Ranking da semana', `${w.getDate()} a ${wEnd.getDate()} de ${MESL[wEnd.getMonth()]} · pontos aprovados`, week, false)}
-      ${board('Ranking do mês', `${MESL[mFrom.getMonth()]} · pontos aprovados × buff`, month, true)}
+      ${board('Ranking da semana', `${w.getDate()} a ${wEnd.getDate()} de ${MESL[wEnd.getMonth()]} · pontuação validada`, week, false)}
+      ${board('Ranking do mês', `${MESL[mFrom.getMonth()]} · pontuação validada × buff`, month, true)}
     </div>
     ${buffArea(mFrom)}
   </section>`;
@@ -427,7 +426,7 @@ function board(title, sub, list, monthly) {
     <div class="c-head"><h3>${ico('ranking')} ${title}</h3><span>${sub}</span></div>
     <div class="podium">${pod}</div>
     ${rest.length ? `<ol class="rest" start="4">${rest.map((x, i) => `<li class="${x.p.id === m.id ? 'me' : ''}" style="--i:${i}"><span class="lb-pos">${i + 4}</span>${avatar(x.p, 'sm')}<span class="lb-name">${esc(x.p.name)}</span><span class="gap">${lead - x.score > 0 ? `−${fmtPts(lead - x.score)}` : ''}</span><b>${fmtPts(x.score)}</b></li>`).join('')}</ol>` : ''}
-    ${list.every(x => !x.score) ? '<p class="muted small center">Ninguém pontuou ainda nesse período. Bora!</p>' : ''}
+    ${list.every(x => !x.score) ? '<p class="muted small center">Sem pontuação validada no período.</p>' : ''}
   </div>`;
 }
 function buffArea(mFrom) {
@@ -439,15 +438,15 @@ function buffArea(mFrom) {
     const pct = Math.min(100, b.avgH / maxH * 100);
     return `<div class="buff-card m${String(b.mult).replace('.', '')} ${p.id === me().id ? 'me' : ''}" style="--pc:${p.color};--i:${i}">
       <div class="bc-top">${avatar(p, 'md')}<div><b>${esc(p.name)}</b><small>${fmtDur(b.minutes)} em ${b.days} dias</small></div><span class="bc-mult">${ico('bolt')}${fmtMult(b.mult)}</span></div>
-      <div class="bc-avg"><b>${fmtNum(b.avgH)}</b><span>h por dia em média</span></div>
+      <div class="bc-avg"><b>${fmtNum(b.avgH)}</b><span>h/dia · média do mês</span></div>
       <div class="bc-track"><i class="bc-fill" style="--w:${pct}%"></i>${tiers.filter(t => t.h > 0).map(t => `<span class="bc-mark" style="left:${t.h / maxH * 100}%"><em>${t.h}h · ${fmtMult(t.mult)}</em></span>`).join('')}</div>
-      <p class="bc-msg">${b.next ? `Faltam <b>${fmtNum(b.next.h - b.avgH)}h por dia</b> de média para ${fmtMult(b.next.mult)}` : 'Buff máximo! 🔥'}</p>
+      <p class="bc-msg">${b.next ? `+<b>${fmtNum(b.next.h - b.avgH)}h/dia</b> de média para atingir ${fmtMult(b.next.mult)}` : 'Faixa máxima atingida'}</p>
     </div>`;
   }).join('');
   return `<div class="buff-area">
     <div class="buff-head">
-      <div><h2>${ico('bolt')} Buff de ${MESL[mFrom.getMonth()]}</h2><p>Quem fica mais tempo online multiplica a pontuação do mês. A média conta <b>todos os dias do mês, inclusive fins de semana</b>. Vale só para PJ.</p></div>
-      <div class="buff-tiers">${tiers.map((t, i) => `<div class="bt m${String(t.mult).replace('.', '')}"><span>${i === 0 ? `menos de ${tiers[1]?.h ?? '—'}h/dia` : i === tiers.length - 1 ? `mais de ${t.h}h/dia` : `${t.h}h a ${tiers[i + 1].h}h/dia`}</span><b>${t.mult === 1 ? 'sem buff' : fmtMult(t.mult)}</b></div>`).join('')}</div>
+      <div><h2>Buff · ${MESL[mFrom.getMonth()]}</h2><p>Multiplicador aplicado à pontuação mensal conforme a média de horas registradas por dia. Base de cálculo: <b>todos os dias corridos do mês, incluindo fins de semana</b>. Aplicável a PJ.</p></div>
+      <div class="buff-tiers">${tiers.map((t, i) => `<div class="bt m${String(t.mult).replace('.', '')}"><span>${i === 0 ? `menos de ${tiers[1]?.h ?? '—'}h/dia` : i === tiers.length - 1 ? `mais de ${t.h}h/dia` : `${t.h}h a ${tiers[i + 1].h}h/dia`}</span><b>${t.mult === 1 ? '×1,0' : fmtMult(t.mult)}</b></div>`).join('')}</div>
     </div>
     ${pjs.length ? `<div class="buff-grid">${cards}</div>` : '<div class="empty-card">Nenhum designer PJ cadastrado.</div>'}
   </div>`;
@@ -468,27 +467,27 @@ function viewMetricas() {
     return `<div class="card lb"><div class="c-head"><h3>${title}</h3><span>${sub}</span></div><ol>${list.map(({ p, s }, i) => `<li class="${p.id === m.id ? 'me' : ''}" style="--i:${i}"><span class="lb-pos ${i === 0 && key(s) > 0 ? 'first' : ''}">${i + 1}</span>${avatar(p, 'sm')}<span class="lb-name">${esc(firstName(p.name))}</span><span class="lb-bar"><i style="--w:${key(s) / max * 100}%;background:${p.color}"></i></span><b>${money && !canSee(p) ? '•••' : fmt(s)}</b></li>`).join('')}</ol></div>`;
   };
   return `<section class="page">
-    ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${plural(tot.pend, 'card aguardando', 'cards aguardando')} aprovação</b> · ${fmtPts(tot.pendPts)} pts que ainda não entram no valor</span><em>${admin ? 'Conferir' : 'Ver'} ${ico('right')}</em></button>` : ''}
+    ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${plural(tot.pend, 'card em revisão', 'cards em revisão')}</b> · ${fmtPts(tot.pendPts)} pts fora do cálculo até a validação</span><em>${admin ? 'Revisar' : 'Ver'} ${ico('right')}</em></button>` : ''}
     <div class="kpis">
-      <div class="kpi dark"><span>${admin ? 'Gasto no período' : 'Você recebe'}</span><b>${num(admin ? tot.pay : (all.find(x => x.p.id === m.id)?.s.pay || 0), 'brl')}</b><small>${admin ? `${fmtBRL(tot.cards ? tot.pay / tot.cards : 0)} por card` : 'com buff, só aprovados'}</small></div>
-      <div class="kpi"><span>Pontos aprovados</span><b>${num(tot.pts)}</b><small>${fmtNum(tot.cards ? tot.pts / tot.cards : 0)} pts por card</small></div>
-      <div class="kpi"><span>Cards aprovados</span><b>${num(tot.cards, 'int')}</b><small>${tot.cards ? fmtDur(tot.cmin / tot.cards) : '—'} por card em média</small></div>
-      <div class="kpi"><span>Horas online</span><b>${num(tot.min, 'dur')}</b><small>${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h por designer</small></div>
+      <div class="kpi dark"><span>${admin ? 'Custo do período' : 'Remuneração prevista'}</span><b>${num(admin ? tot.pay : (all.find(x => x.p.id === m.id)?.s.pay || 0), 'brl')}</b><small>${admin ? `custo médio ${fmtBRL(tot.cards ? tot.pay / tot.cards : 0)}/card` : 'cards validados × buff'}</small></div>
+      <div class="kpi"><span>Pontuação validada</span><b>${num(tot.pts)}</b><small>média ${fmtNum(tot.cards ? tot.pts / tot.cards : 0)} pts/card</small></div>
+      <div class="kpi"><span>Cards validados</span><b>${num(tot.cards, 'int')}</b><small>tempo médio ${tot.cards ? fmtDur(tot.cmin / tot.cards) : '—'}/card</small></div>
+      <div class="kpi"><span>Horas registradas</span><b>${num(tot.min, 'dur')}</b><small>média ${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h/designer</small></div>
     </div>
     <div class="lb-grid">
-      ${lb('Mais tempo online', 'horas no período', s => s.minutes, s => fmtDur(s.minutes))}
-      ${lb('Mais cards', 'aprovados', s => s.cards, s => `${s.cards}`)}
-      ${lb('Mais cards difíceis', 'marcados como difícil', s => s.hard, s => `${s.hard}`)}
-      ${lb('A receber', 'com buff', s => s.pay || 0, s => s.pay == null ? 'fixo' : fmtBRL(s.pay), true)}
+      ${lb('Horas registradas', 'no período', s => s.minutes, s => fmtDur(s.minutes))}
+      ${lb('Volume', 'cards validados', s => s.cards, s => `${s.cards}`)}
+      ${lb('Alta complexidade', 'cards difíceis', s => s.hard, s => `${s.hard}`)}
+      ${lb('Produtividade', 'pts validados por hora', s => s.minutes ? s.points / (s.minutes / 60) : 0, s => s.minutes ? fmtNum(s.points / (s.minutes / 60), 2) : '—')}
     </div>
     <div class="grid-2">
       <div class="card">${chart(all, from, to)}</div>
       <div class="card">${breakdown(all)}</div>
     </div>
     <div class="card flush">
-      <div class="c-head pad"><h3>Fechamento</h3><span>${esc(label)} · só cards aprovados entram no valor</span><span class="sp"></span><button class="btn line sm" data-export-csv>${ico('sheet')}Exportar planilha</button></div>
+      <div class="c-head pad"><h3>Fechamento</h3><span>${esc(label)} · apenas cards validados compõem o valor</span><span class="sp"></span><button class="btn line sm" data-export-csv>${ico('sheet')}Exportar planilha</button></div>
       <div class="table-wrap"><table class="grid close">
-        <thead><tr><th>Designer</th><th class="num">Cards</th><th class="num">Pontos</th><th class="num">Aguardando</th><th class="num">Pts/card</th><th class="num">Tempo/card</th><th class="num">Difíceis</th><th class="num">Online</th><th class="num">Média/dia (mês)</th><th class="num">Buff</th><th class="num">A receber</th></tr></thead>
+        <thead><tr><th>Designer</th><th class="num">Cards</th><th class="num">Pts validados</th><th class="num">Em revisão</th><th class="num">Pts/card</th><th class="num">Tempo/card</th><th class="num">Alta compl.</th><th class="num">Horas</th><th class="num">Média h/dia</th><th class="num">Buff</th><th class="num">Remuneração</th></tr></thead>
         <tbody>${[...all].sort((a, b) => b.s.points - a.s.points).map(({ p, s }, i) => `<tr class="${p.id === m.id ? 'me' : ''}" style="--i:${i}">
           <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
           <td class="num">${s.cards}</td><td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending || '—'}</td>
@@ -518,12 +517,12 @@ function chart(all, from, to) {
     if (days.length <= 16 || i % Math.ceil(days.length / 16) === 0) svg += `<text x="${(x + w / 2).toFixed(1)}" y="${Hh - 6}" class="ax" text-anchor="middle">${days.length <= 7 ? WD[parseKey(k).getDay()] : parseKey(k).getDate()}</text>`;
   });
   svg += '</svg>';
-  return `<div class="c-head"><h3>Pontos aprovados por dia</h3></div>${svg}<div class="legend">${all.map(({ p }) => `<span><i style="background:${p.color}"></i>${esc(firstName(p.name))}</span>`).join('')}</div>`;
+  return `<div class="c-head"><h3>Pontuação validada por dia</h3></div>${svg}<div class="legend">${all.map(({ p }) => `<span><i style="background:${p.color}"></i>${esc(firstName(p.name))}</span>`).join('')}</div>`;
 }
 function breakdown(all) {
   const by = {}; all.forEach(({ s }) => Object.entries(s.byKind).forEach(([k, v]) => { by[k] = (by[k] || 0) + v; }));
   const total = Object.values(by).reduce((a, b) => a + b, 0), keys = Object.keys(by).sort((a, b) => by[b] - by[a]);
-  return `<div class="c-head"><h3>De onde vêm os pontos</h3><span>por tipo de atividade</span></div>
+  return `<div class="c-head"><h3>Composição da pontuação</h3><span>por tipo de atividade</span></div>
     ${total ? `<div class="stackbar">${keys.map((k, i) => `<i style="--w:${by[k] / total * 100}%;background:${kindOf(k).color};--i:${i}"></i>`).join('')}</div>
     <ul class="bd">${keys.map(k => `<li style="--tc:${kindOf(k).color}"><i></i><span>${esc(kindOf(k).label)}</span><b>${fmtPts(by[k])} pts</b><em>${Math.round(by[k] / total * 100)}%</em></li>`).join('')}</ul>` : '<p class="muted">Nenhum ponto aprovado no período.</p>'}`;
 }
@@ -567,19 +566,19 @@ function cfgPontos() {
     ${arr.length > 1 && i > 0 ? `<button class="tier-x" data-del-tier="${i}" aria-label="remover faixa">${ico('x')}</button>` : ''}</div>`).join('');
   return `<div class="grid-pts">
     <div class="col">
-      ${cfgList('kinds', 'Tipos de atividade', 'a base de cada card', ['color', 'hint', 'pts'], { removable: true, addable: true, addLabel: 'Novo tipo', keep: ['logo'] })}
+      ${cfgList('kinds', 'Tipos de atividade', 'pontuação base', ['color', 'hint', 'pts'], { removable: true, addable: true, addLabel: 'Novo tipo', keep: ['logo'] })}
       <div class="grid-2">
-        ${cfgList('logoQ', 'Logo recebida', 'soma na base', ['pts'], { plus: true, removable: true, addable: true, addLabel: 'Nova opção', keep: ['alta'] })}
-        ${cfgList('adds', 'Adicionais', 'por unidade', ['pts'], { plus: true, removable: true, addable: true, addLabel: 'Novo adicional' })}
+        ${cfgList('logoQ', 'Arquivo de logo', 'acréscimo à base', ['pts'], { plus: true, removable: true, addable: true, addLabel: 'Nova opção', keep: ['alta'] })}
+        ${cfgList('adds', 'Itens adicionais', 'por unidade', ['pts'], { plus: true, removable: true, addable: true, addLabel: 'Novo adicional' })}
       </div>
-      ${cfgList('diffs', 'Dificuldade', 'cor da linha do card · não muda pontos', ['color'], {})}
+      ${cfgList('diffs', 'Complexidade', 'indicador visual · não altera a pontuação', ['color'], {})}
     </div>
     <div class="col">
-      <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>antes do buff</span></div>
+      <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>base de cálculo, sem buff</span></div>
         <label class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"></label></div>
-      <div class="card"><div class="c-head"><h3>${ico('bolt')} Buff do mês</h3><span>só PJ · média por dia do mês, com fins de semana</span></div>
+      <div class="card"><div class="c-head"><h3>Faixas de buff</h3><span>PJ · média diária de horas no mês (dias corridos)</span></div>
         <div class="tiers">${tiers}</div><button class="btn line sm" data-add-tier>${ico('plus')}Faixa</button>
-        <p class="muted small">A receber = pontos aprovados × ${fmtBRL(st.pointValue)} × buff.</p></div>
+        <p class="muted small">Remuneração = pts validados × ${fmtBRL(st.pointValue)} × buff.</p></div>
     </div>
   </div>`;
 }
@@ -608,14 +607,14 @@ let actCtx = null, editingPerson = null, hoursCtx = null;
 function openAct(mode, a) {
   const admin = isAdmin(), ro = mode === 'view';
   actCtx = { mode, id: a.id };
-  const titles = { edit: admin ? 'Editar card' : (a.status === 'erro' ? 'Corrigir e reenviar' : 'Editar card'), erro: 'Pedir correção', recusada: 'Recusar card', view: 'Detalhes do card' };
-  const hint = mode === 'erro' ? 'Diga o que precisa corrigir. O designer vê o comentário e reenvia.' : mode === 'recusada' ? 'Diga o motivo. Card recusado não entra no valor.' : (a.note ? `Comentário da gestão: ${a.note}` : '');
+  const titles = { edit: admin ? 'Editar card' : (a.status === 'erro' ? 'Ajustar e reenviar' : 'Editar card'), erro: 'Solicitar ajuste', recusada: 'Reprovar card', view: 'Detalhes do card' };
+  const hint = mode === 'erro' ? 'Descreva o ajuste necessário. O designer recebe o parecer e reenvia o registro.' : mode === 'recusada' ? 'Informe o motivo. Cards reprovados não compõem a remuneração.' : (a.note ? `Parecer da gestão: ${a.note}` : '');
   const sc = scoreOf(a), override = Math.abs(sc.total - a.pts) > 0.001 ? a.pts : null;
   $('#actForm').innerHTML = `
     <header><h2>${titles[mode]}</h2><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
     ${hint ? `<p class="dlg-hint">${esc(hint)}</p>` : ''}
     <fieldset class="cp-grid dlg" ${ro ? 'disabled' : ''}><div class="cp-fields">${cardFields(a)}</div>${receipt(a, { override })}</fieldset>
-    ${admin ? `<div class="adm-box"><label class="f"><span>Status</span><select name="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${(mode === 'erro' || mode === 'recusada' ? mode : a.status) === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label><label class="f"><span>Comentário para o designer</span><input name="note" value="${esc(a.note || '')}" placeholder="ex.: a logo não era de baixa qualidade" autocomplete="off"></label></div>` : ''}
+    ${admin ? `<div class="adm-box"><label class="f"><span>Status</span><select name="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${(mode === 'erro' || mode === 'recusada' ? mode : a.status) === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label><label class="f"><span>Parecer para o designer</span><input name="note" value="${esc(a.note || '')}" placeholder="ex.: a logo não era de baixa qualidade" autocomplete="off"></label></div>` : ''}
     <p class="err" id="actErr" role="alert"></p>
     <footer>${admin ? '<button type="button" class="btn line danger" id="delAct">Excluir</button>' : ''}<span class="sp"></span><button type="button" class="btn line" data-close>${ro ? 'Fechar' : 'Cancelar'}</button>${ro ? '' : '<button type="submit" class="btn dark">Salvar</button>'}</footer>`;
   $('#actDlg').showModal();
@@ -704,10 +703,10 @@ function bind() {
       const list = S.activities.filter(a => a.designerId === el.dataset.approveAll && a.status === 'pendente' && inRange(a.date, from, to));
       list.forEach(a => { a.status = 'aprovada'; ui.flash[a.id] = 'ok'; });
       addLog(`aprovou ${list.length} cards de ${firstName(person(el.dataset.approveAll).name)}`);
-      save(); render(); toast(plural(list.length, 'card aprovado', 'cards aprovados')); return;
+      save(); render(); toast(plural(list.length, 'card validado', 'cards validados')); return;
     }
     if ((el = t.closest('[data-toggle]'))) { if (t.closest('button, select, input')) return; if (visiblePeople().length === 1) return; ui.closed[el.dataset.toggle] = !ui.closed[el.dataset.toggle]; el.closest('.block').classList.toggle('closed'); return; }
-    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { a.status = 'aprovada'; a.note = ''; ui.flash[a.id] = 'ok'; addLog(`aprovou: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)`); save(); render(); toast('Card aprovado'); } return; }
+    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { a.status = 'aprovada'; a.note = ''; ui.flash[a.id] = 'ok'; addLog(`aprovou: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)`); save(); render(); toast('Card validado'); } return; }
     if ((el = t.closest('[data-mark]'))) { const [id, st] = el.dataset.mark.split('|'); const a = act(id); if (a) openAct(st, a); return; }
     if ((el = t.closest('[data-edit-act]'))) { const a = act(el.dataset.editAct); if (a) openAct('edit', a); return; }
     if ((el = t.closest('[data-view-act]'))) { const a = act(el.dataset.viewAct); if (a) openAct('view', a); return; }
@@ -788,7 +787,7 @@ function bind() {
       ui.draft = { ...emptyCard(n.designerId), date: n.date };
       const again = e.submitter && e.submitter.name === 'again';
       if (again) { render(); openNew(); } else { closeDlg($('#actDlg')); render(); }
-      toast(`Card lançado · ${fmtPts(n.pts)} ${n.pts === 1 ? 'ponto' : 'pontos'}${isAdmin() ? '' : ' · aguardando aprovação'}`);
+      toast(`Card registrado · ${fmtPts(n.pts)} pts${isAdmin() ? ' · validado' : ' · em revisão'}`);
       return;
     }
     const a = act(actCtx.id), admin = isAdmin();
@@ -797,7 +796,7 @@ function bind() {
     if (admin) addLog(`${STATUS[a.status].label.toLowerCase()}: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`);
     ui.flash[a.id] = a.status === 'aprovada' ? 'ok' : a.status === 'recusada' || a.status === 'erro' ? 'warn' : 'edit';
     save(); closeDlg($('#actDlg')); render();
-    toast(actCtx.mode === 'erro' ? 'Correção pedida' : actCtx.mode === 'recusada' ? 'Card recusado' : (!admin ? 'Enviado para aprovação' : 'Salvo'), actCtx.mode === 'edit' ? 'ok' : 'warn');
+    toast(actCtx.mode === 'erro' ? 'Ajuste solicitado' : actCtx.mode === 'recusada' ? 'Card reprovado' : (!admin ? 'Reenviado para validação' : 'Alterações salvas'), actCtx.mode === 'edit' ? 'ok' : 'warn');
   });
   $('#actForm').addEventListener('click', e => { if (e.target.id === 'delAct') { if (!confirm('Excluir este card?')) return; S.activities = S.activities.filter(a => a.id !== actCtx.id); addLog('excluiu um card'); save(); closeDlg($('#actDlg')); render(); toast('Excluído', 'info'); } });
 
@@ -833,7 +832,7 @@ function closeDlg(dl) { if (!dl.open) return; dl.classList.add('closing'); setTi
 function exportCSV() {
   const { from, to, label } = period();
   const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Nº lulu', 'Tipo de atividade', 'Logo recebida', ...S.settings.adds.map(a => a.label), 'Dificuldade', 'Tempo (min)', 'Detalhes', 'Pontos', 'Status', 'Comentário da gestão', 'Valor (R$, sem buff)'].join(';')];
+  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Nº lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Justificativa', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$, sem buff)'].join(';')];
   for (const p of isAdmin() ? designers() : [me()]) {
     const s = stats(p.id, from, to);
     for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
