@@ -10,7 +10,7 @@ Admin e designers usam **as mesmas telas**. O admin só ganha o menu **Configura
 
 | Menu | Quem vê | O que tem |
 |---|---|---|
-| **Atividades** | todos | Resumo do período (pontos aprovados, aguardando, horas online, Buff e a receber), o formulário **Lançar card** com o recibo de pontos calculado na hora, e a lista de cards de cada designer. O admin aprova, pede correção, recusa, edita, ajusta pontos e lança as horas online. |
+| **Atividades** | todos | Resumo do período (pontos aprovados, aguardando, horas online, Buff e a receber), o botão **Lançar card** no topo (atalho **N**, no celular é o botão amarelo flutuante), que abre uma janela com o recibo de pontos calculado na hora, e a lista de cards de cada designer. O admin aprova, pede correção, recusa, edita, ajusta pontos e lança as horas online. |
 | **Ranking** | todos | Pódio da semana e do mês (o mês já conta o Buff) e a área **Buff** com a média de horas por dia de cada PJ e quanto falta para a próxima faixa. |
 | **Métricas** | todos | Gasto, pontos, horas, rankings (tempo online, cards, cards difíceis), gráfico por dia, pontos por tipo de atividade e a tabela de fechamento com exportação para o Excel. O designer não vê quanto os outros recebem. |
 | **Configurações** | só admin | Equipe, Pontuação (tipos, logo recebida, adicionais, dificuldade, valor do ponto e faixas do Buff), Horas online e Dados. |
