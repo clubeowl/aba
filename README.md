@@ -42,29 +42,15 @@ Dificuldade (leve, moderado, difícil) não muda os pontos: vira a linha azul, a
 
 ## Buff (só PJ)
 
-São dois fatores que se multiplicam.
+Média de horas registradas por dia **no mês, contando todos os dias corridos (inclusive fins de semana)**:
 
-**Horas:** média de horas registradas por dia no mês, **contando fins de semana**.
-
-| Média por dia | Fator |
+| Média por dia | Buff nos pontos do mês |
 |---|---|
 | menos de 8h | ×1,0 |
 | de 8h a 12h | ×1,5 |
 | mais de 12h | ×2,0 |
 
-**Dias trabalhados:** dias do mês com horas registradas.
-
-| Dias no mês | Fator |
-|---|---|
-| até 20 | ×1,0 |
-| 21 a 29 | ×1,1 |
-| 30 (ou o mês inteiro, em meses mais curtos) | ×1,2 |
-
-Exemplo: 9h/dia de média (×1,5) e 24 dias trabalhados (×1,1) = Buff ×1,65.
-
-As faixas dos dois fatores ficam em Configurações → Pontuação.
-
-**Remuneração prevista** = pontos validados × valor do ponto (R$ 3,00) × Buff de horas × Buff de dias.
+**Remuneração prevista** = pontos validados × valor do ponto (R$ 3,00) × Buff.
 
 ## Publicar no GitHub Pages
 
