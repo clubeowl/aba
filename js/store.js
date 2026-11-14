@@ -45,6 +45,13 @@ const DEFAULT_SETTINGS = {
     { h: 8,  mult: 1.5 },
     { h: 12, mult: 2.0 },
   ],
+  /* Buff por dias trabalhados no mês (só PJ). Dia trabalhado = dia com horas registradas.
+     A faixa de 30 dias vale como "o mês inteiro" em meses mais curtos. */
+  buffDays: [
+    { d: 0,  mult: 1.0 },
+    { d: 21, mult: 1.1 },
+    { d: 30, mult: 1.2 },
+  ],
 };
 
 /* ---------- utils ---------- */
@@ -81,7 +88,7 @@ function normalize(s) {
     ...base,
     pointValue: typeof st.pointValue === 'number' ? st.pointValue : base.pointValue,
     ...(st.kinds ? { kinds: st.kinds } : {}), ...(st.logoQ ? { logoQ: st.logoQ } : {}), ...(st.adds ? { adds: st.adds } : {}),
-    ...(st.diffs ? { diffs: st.diffs } : {}), ...(st.buff ? { buff: st.buff } : {}),
+    ...(st.diffs ? { diffs: st.diffs } : {}), ...(st.buff ? { buff: st.buff } : {}), ...(st.buffDays ? { buffDays: st.buffDays } : {}),
   };
   const out = {
     version: 3, settings,
@@ -153,7 +160,16 @@ function monthBuff(pid, ref) {
   const eligible = !!p && p.regime === 'PJ';
   const tiers = [...S.settings.buff].sort((a, b) => a.h - b.h);
   const next = tiers.find(t => t.h > avgH);
-  return { minutes, days, avgH, mult: eligible ? buffMult(avgH) : 1, eligible, next: eligible ? next : null };
+  // dias trabalhados: dias do mês com horas registradas
+  const monthDays = last.getDate();
+  let worked = 0;
+  for (let d = first; d <= last; d = addDays(d, 1)) if (onlineMin(pid, dkey(d)) > 0) worked++;
+  const dTiers = [...(S.settings.buffDays || [])].map(t => ({ ...t, need: Math.min(t.d, monthDays) })).sort((a, b) => a.need - b.need);
+  let dMult = 1; for (const t of dTiers) if (worked >= t.need) dMult = t.mult;
+  const nextDays = dTiers.find(t => t.need > worked) || null;
+  const hMult = eligible ? buffMult(avgH) : 1;
+  dMult = eligible ? dMult : 1;
+  return { minutes, days, avgH, hMult, worked, monthDays, dMult, mult: Math.round(hMult * dMult * 1000) / 1000, eligible, next: eligible ? next : null, nextDays: eligible ? nextDays : null };
 }
 
 /* números de um designer num intervalo de datas (chaves inclusive) */

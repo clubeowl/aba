@@ -18,6 +18,7 @@ const fmtPts = n => (Math.round(n * 100) / 100).toLocaleString('pt-BR', { maximu
 const fmtNum = (n, d = 1) => n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtBRL = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDur = min => { min = Math.max(0, Math.round(min)); const h = Math.floor(min / 60), m = min % 60; return h ? `${h}h${pad(m)}` : `${m}min`; };
+const multCls = m => m >= 2 ? 'm2' : m >= 1.5 ? 'm15' : m > 1 ? 'm11' : 'm1';
 const fmtMult = m => `×${fmtNum(m, Math.round(m * 100) % 10 ? 2 : 1)}`;
 const fmtDay = k => { const d = parseKey(k); return `${WD[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`; };
 const parseHM = v => { v = String(v || '').trim().replace(',', '.'); if (!v) return 0; if (/[:h]/.test(v)) { const [h, m] = v.split(/[:h]/); return (+h || 0) * 60 + (+m || 0); } return Math.round(parseFloat(v) * 60) || 0; };
@@ -68,6 +69,7 @@ const I = {
   chev: '<path d="m6 9 6 6 6-6"/>',
   spark: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
 };
+const hint = t => `<i class="hint" tabindex="0" data-tip="${esc(t)}">i</i>`;
 const ico = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n] || ''}</svg>`;
 /* número que conta ao entrar na tela */
 const num = (v, kind = 'pts') => `<span class="count" data-count="${+v || 0}" data-kind="${kind}">${kind === 'brl' ? fmtBRL(+v || 0) : kind === 'dur' ? fmtDur(+v || 0) : kind === 'int' ? Math.round(v) : fmtPts(+v || 0)}</span>`;
@@ -102,12 +104,13 @@ function render() {
   const titles = { atividades: 'Atividades', ranking: 'Ranking', metricas: 'Métricas', config: 'Configurações' };
   const sub = ui.view === 'config' ? 'só a gestão vê' : ui.view === 'ranking' ? rankLabel() : period().label;
   $('#title').innerHTML = `<h1>${titles[ui.view]}</h1><span>${esc(sub)}</span>`;
-  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : ui.view === 'ranking' ? `<div class="period-ctl"><div class="stepper"><button class="icon-btn" data-rshift="-1" aria-label="semana anterior">${ico('left')}</button><button class="today-btn" data-rshift="0">Esta semana</button><button class="icon-btn" data-rshift="1" aria-label="próxima semana">${ico('right')}</button></div></div>` : periodCtl() + (ui.view === 'atividades' && designers().length ? `<button class="btn brand new-card" data-new-card data-tip="atalho: N">${ico('plus')}Registrar card</button>` : '');
+  $('#topctl').innerHTML = ui.view === 'config' && ui.cfg !== 'horas' ? '' : ui.view === 'ranking' ? `<div class="period-ctl"><div class="stepper"><button class="icon-btn" data-rshift="-1" aria-label="semana anterior">${ico('left')}</button><button class="today-btn" data-rshift="0">Esta semana</button><button class="icon-btn" data-rshift="1" aria-label="próxima semana">${ico('right')}</button></div></div>` : periodCtl();
   renderMe();
   const html = ({ atividades: viewAtividades, ranking: viewRanking, metricas: viewMetricas, config: viewConfig })[ui.view]();
   const main = $('#main');
   main.innerHTML = html;
   main.classList.toggle('enter', ui.enter);
+  const fab = $('#fab'); if (fab) fab.classList.toggle('off', !designers().length || ui.view === 'config');
   after();
 }
 const lastPos = {};
@@ -167,7 +170,6 @@ function viewAtividades() {
       <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, nº lulu…" value="${esc(ui.q)}" data-q></label>
     </div>
     ${ppl.map((p, i) => block(p, from, to, i)).join('')}
-    <button class="fab" data-new-card aria-label="Registrar card">${ico('plus')}</button>
   </section>`;
 }
 
@@ -191,18 +193,18 @@ function summary(ppl, from, to) {
   if (one) {
     const b = one.s.buff;
     buffCell = b.eligible
-      ? `<div class="sm-buff m${String(b.mult).replace('.', '')}"><span>Buff · ${MONTHL(parseKey(to))}</span><b>${fmtMult(b.mult)}</b><small>média ${fmtNum(b.avgH)}h/dia${b.next ? ` · +${fmtNum(b.next.h - b.avgH)}h p/ ${fmtMult(b.next.mult)}` : ' · faixa máxima'}</small></div>`
-      : `<div class="sm-buff"><span>Buff</span><b>—</b><small>aplicável apenas a PJ</small></div>`;
+      ? `<div class="sm-buff ${multCls(b.mult)}"><span>Buff · ${MONTHL(parseKey(to))}${hint(buffTip())}</span><b>${fmtMult(b.mult)}</b><small>horas ${fmtMult(b.hMult)} · dias ${fmtMult(b.dMult)} (${b.worked}/${b.monthDays})</small></div>`
+      : `<div class="sm-buff"><span>Buff${hint(buffTip())}</span><b>—</b><small>aplicável apenas a PJ</small></div>`;
   } else {
     const pj = st.filter(x => x.s.buff.eligible), on = pj.filter(x => x.s.buff.mult > 1).length;
-    buffCell = `<div class="sm-buff"><span>Buff ativo</span><b>${on}<i>/ ${pj.length}</i></b><small>PJs com multiplicador no mês</small></div>`;
+    buffCell = `<div class="sm-buff"><span>Buff ativo${hint(buffTip())}</span><b>${on}<i>/ ${pj.length}</i></b><small>PJs com multiplicador no mês</small></div>`;
   }
   return `<div class="summary">
     <div class="sm-main"><span>Pontuação validada${admin ? ` · ${esc(who)}` : ''}</span><b>${num(t.pts)}<i>pts</i></b><small>${plural(t.cards, 'card validado', 'cards validados')}</small></div>
-    <div><span>Em revisão</span><b>${num(t.pendPts)}<i>pts</i></b><small>${plural(t.pend, 'card pendente', 'cards pendentes')}</small></div>
-    <div><span>Horas registradas</span><b>${num(t.min, 'dur')}</b><small>${one ? 'no período' : 'total da equipe'}</small></div>
+    <div><span>Em revisão${hint('Pontos ainda não validados pela gestão. Não entram no cálculo da remuneração até a validação.')}</span><b>${num(t.pendPts)}<i>pts</i></b><small>${plural(t.pend, 'card pendente', 'cards pendentes')}</small></div>
+    <div><span>Horas registradas${hint('Horas online registradas pela gestão. São a base de cálculo do Buff mensal.')}</span><b>${num(t.min, 'dur')}</b><small>${one ? 'no período' : 'total da equipe'}</small></div>
     ${buffCell}
-    <div class="sm-pay"><span>${admin && !one ? 'Custo previsto' : 'Remuneração prevista'}</span><b>${num(t.pay, 'brl')}</b><small>pts validados × ${fmtBRL(S.settings.pointValue)}${one && one.s.buff.mult > 1 ? ' × buff' : ''}</small></div>
+    <div class="sm-pay"><span>${admin && !one ? 'Custo previsto' : 'Remuneração prevista'}${hint('Valor estimado, calculado só com cards validados. O Buff é aplicado no fechamento do mês e o valor final pode mudar até lá.')}</span><b>${num(t.pay, 'brl')}</b><small>pts validados × ${fmtBRL(S.settings.pointValue)}${one && one.s.buff.mult > 1 ? ' × buff' : ''}</small></div>
   </div>`;
 }
 
@@ -274,13 +276,20 @@ function receipt(c, opts = {}) {
   </aside>`;
 }
 const clientOpts = did => [...new Set(S.activities.filter(a => a.designerId === did && a.client).slice(-120).map(a => a.client))].map(x => `<option value="${esc(x)}">`).join('');
+function tierText(arr, f, unit) {
+  const t = [...(arr || [])].sort((a, b) => a[f] - b[f]);
+  return t.map((x, i) => (t[i + 1] ? (x[f] ? `${x[f]}–${t[i + 1][f] - (f === 'd' ? 1 : 0)}${unit}` : `até ${t[i + 1][f] - (f === 'd' ? 1 : 0)}${unit}`) : `${x[f]}${unit}${f === 'd' ? '' : '+'}`) + ' ' + fmtMult(x.mult)).join(' · ');
+}
+function buffTip() {
+  return `Multiplicador mensal aplicável a PJ, resultado de dois fatores. Horas (média por dia no mês, contando fins de semana): ${tierText(S.settings.buff, 'h', 'h')}. Dias trabalhados no mês: ${tierText(S.settings.buffDays, 'd', ' dias')}. Os fatores se multiplicam.`;
+}
 function newDesigner() {
   if (!isAdmin()) return me().id;
   if (ui.who !== 'all' && person(ui.who)) return ui.who;
   if (ui.draft && person(ui.draft.designerId)) return ui.draft.designerId;
   return (designers()[0] || {}).id;
 }
-function openNew() {
+function openNew(fromFab) {
   if (!designers().length) return;
   const admin = isAdmin(), did = newDesigner();
   const c = ui.draft && ui.draft.designerId === did ? ui.draft : emptyCard(did);
@@ -290,8 +299,8 @@ function openNew() {
     <fieldset class="cp-grid dlg"><div class="cp-fields">${cardFields(c)}</div>${receipt(c)}</fieldset>
     <datalist id="clientList">${clientOpts(did)}</datalist>
     <p class="err" id="actErr" role="alert"></p>
-    <footer><span class="k-hint"><kbd>Esc</kbd> fecha</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button></footer>`;
-  const dl = $('#actDlg'); if (!dl.open) dl.showModal();
+    <footer><span class="k-hint"><i class="hint-dot">i</i>Pontuação estimada, sujeita à validação da gestão.</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button></footer>`;
+  const dl = $('#actDlg'); if (!dl.open) { dl.classList.toggle('from-fab', !!fromFab); dl.showModal(); }
   $('#actForm').scrollTop = 0;
   $('#actForm').elements.client.focus();
 }
@@ -344,7 +353,7 @@ function block(p, from, to, idx) {
         <span class="chip"><small>Validados</small><b>${fmtPts(s.points)}</b></span>
         ${pendN ? `<span class="chip warn"><small>Em revisão</small><b>${pendN}</b></span>` : ''}
         <${admin ? 'button' : 'span'} class="chip ${admin ? 'edit' : ''}" ${admin ? `data-hours="${p.id}" data-tip="Registrar horas"` : ''}><small>Horas</small><b>${fmtDur(s.minutes)}</b>${admin ? ico('clock', 'mini') : ''}</${admin ? 'button' : 'span'}>
-        <span class="chip buff m${String(b.mult).replace('.', '')}" ${b.eligible ? `data-tip="${fmtNum(b.avgH)}h/dia em ${MONTHL(parseKey(to))}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>
+        <span class="chip buff ${multCls(b.mult)}" ${b.eligible ? `data-tip="${MONTHL(parseKey(to))}: ${fmtNum(b.avgH)}h/dia ${fmtMult(b.hMult)} · ${b.worked} dias ${fmtMult(b.dMult)}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>
       </div>
       ${admin && pendN ? `<button class="btn ok sm" data-approve-all="${p.id}">${ico('check')}Validar ${pendN}</button>` : ''}
       ${one ? '' : `<span class="b-chev">${ico('chev')}</span>`}
@@ -432,21 +441,34 @@ function board(title, sub, list, monthly) {
 function buffArea(mFrom) {
   const tiers = [...S.settings.buff].sort((a, b) => a.h - b.h);
   const maxH = Math.max(14, (tiers[tiers.length - 1]?.h || 12) + 2);
+  const dTiers = [...(S.settings.buffDays || [])].sort((a, b) => a.d - b.d);
   const pjs = designers().filter(p => p.regime === 'PJ');
   const cards = pjs.map((p, i) => {
     const b = monthBuff(p.id, mFrom);
     const pct = Math.min(100, b.avgH / maxH * 100);
-    return `<div class="buff-card m${String(b.mult).replace('.', '')} ${p.id === me().id ? 'me' : ''}" style="--pc:${p.color};--i:${i}">
-      <div class="bc-top">${avatar(p, 'md')}<div><b>${esc(p.name)}</b><small>${fmtDur(b.minutes)} em ${b.days} dias</small></div><span class="bc-mult">${ico('bolt')}${fmtMult(b.mult)}</span></div>
-      <div class="bc-avg"><b>${fmtNum(b.avgH)}</b><span>h/dia · média do mês</span></div>
-      <div class="bc-track"><i class="bc-fill" style="--w:${pct}%"></i>${tiers.filter(t => t.h > 0).map(t => `<span class="bc-mark" style="left:${t.h / maxH * 100}%"><em>${t.h}h · ${fmtMult(t.mult)}</em></span>`).join('')}</div>
-      <p class="bc-msg">${b.next ? `+<b>${fmtNum(b.next.h - b.avgH)}h/dia</b> de média para atingir ${fmtMult(b.next.mult)}` : 'Faixa máxima atingida'}</p>
+    return `<div class="buff-card ${multCls(b.mult)} ${p.id === me().id ? 'me' : ''}" style="--pc:${p.color};--i:${i}">
+      <div class="bc-top">${avatar(p, 'md')}<div><b>${esc(p.name)}</b><small>${fmtDur(b.minutes)} no mês · ${fmtMult(b.hMult)} × ${fmtMult(b.dMult)}</small></div><span class="bc-mult">${ico('bolt')}${fmtMult(b.mult)}</span></div>
+      <div class="bc-factors">
+        <div class="bc-f">
+          <div class="bc-avg"><b>${fmtNum(b.avgH)}</b><span>h/dia · média</span><em class="bc-fx">${fmtMult(b.hMult)}</em></div>
+          <div class="bc-track"><i class="bc-fill" style="--w:${pct}%"></i>${tiers.filter(t => t.h > 0).map(t => `<span class="bc-mark" style="left:${t.h / maxH * 100}%"><em>${t.h}h</em></span>`).join('')}</div>
+          <p class="bc-msg">${b.next ? `+<b>${fmtNum(b.next.h - b.avgH)}h/dia</b> para ${fmtMult(b.next.mult)}` : 'Faixa máxima'}</p>
+        </div>
+        <div class="bc-f">
+          <div class="bc-avg"><b>${b.worked}</b><span>de ${b.monthDays} dias trabalhados</span><em class="bc-fx">${fmtMult(b.dMult)}</em></div>
+          <div class="bc-track days"><i class="bc-fill" style="--w:${Math.min(100, b.worked / b.monthDays * 100)}%"></i>${dTiers.filter(t => t.d > 0).map(t => `<span class="bc-mark" style="left:${Math.min(t.d, b.monthDays) / b.monthDays * 100}%"><em>${Math.min(t.d, b.monthDays)}d</em></span>`).join('')}</div>
+          <p class="bc-msg">${b.nextDays ? `+<b>${b.nextDays.need - b.worked} ${b.nextDays.need - b.worked === 1 ? 'dia' : 'dias'}</b> para ${fmtMult(b.nextDays.mult)}` : 'Faixa máxima'}</p>
+        </div>
+      </div>
     </div>`;
   }).join('');
   return `<div class="buff-area">
     <div class="buff-head">
-      <div><h2>Buff · ${MESL[mFrom.getMonth()]}</h2><p>Multiplicador aplicado à pontuação mensal conforme a média de horas registradas por dia. Base de cálculo: <b>todos os dias corridos do mês, incluindo fins de semana</b>. Aplicável a PJ.</p></div>
-      <div class="buff-tiers">${tiers.map((t, i) => `<div class="bt m${String(t.mult).replace('.', '')}"><span>${i === 0 ? `menos de ${tiers[1]?.h ?? '—'}h/dia` : i === tiers.length - 1 ? `mais de ${t.h}h/dia` : `${t.h}h a ${tiers[i + 1].h}h/dia`}</span><b>${t.mult === 1 ? '×1,0' : fmtMult(t.mult)}</b></div>`).join('')}</div>
+      <div><h2>Buff · ${MESL[mFrom.getMonth()]}</h2><p>Multiplicador da pontuação mensal (PJ), composto por dois fatores que se multiplicam: <b>média de horas por dia</b> (dias corridos, incluindo fins de semana) e <b>dias trabalhados no mês</b> (dias com horas registradas).</p></div>
+      <div class="buff-tiers-wrap">
+        <div class="bt-group"><small>Horas / dia</small><div class="buff-tiers">${tiers.map((t, i) => `<div class="bt ${multCls(t.mult)}"><span>${i === 0 ? `até ${tiers[1]?.h ?? '—'}h` : i === tiers.length - 1 ? `${t.h}h+` : `${t.h}–${tiers[i + 1].h}h`}</span><b>${fmtMult(t.mult)}</b></div>`).join('')}</div></div>
+        <div class="bt-group"><small>Dias trabalhados</small><div class="buff-tiers">${dTiers.map((t, i) => `<div class="bt"><span>${i === 0 ? `até ${(dTiers[1]?.d ?? 1) - 1} dias` : i === dTiers.length - 1 ? `${t.d} dias` : `${t.d}–${dTiers[i + 1].d - 1} dias`}</span><b>${fmtMult(t.mult)}</b></div>`).join('')}</div></div>
+      </div>
     </div>
     ${pjs.length ? `<div class="buff-grid">${cards}</div>` : '<div class="empty-card">Nenhum designer PJ cadastrado.</div>'}
   </div>`;
@@ -492,7 +514,7 @@ function viewMetricas() {
           <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
           <td class="num">${s.cards}</td><td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending || '—'}</td>
           <td class="num">${fmtNum(s.ptsPerCard)}</td><td class="num">${s.avgCardMins ? fmtDur(s.avgCardMins) : '—'}</td><td class="num">${s.hard || '—'}</td>
-          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.buff.avgH)}h</td><td class="num">${s.buff.eligible ? `<span class="mult m${String(s.buff.mult).replace('.', '')}">${fmtMult(s.buff.mult)}</span>` : '<span class="muted">CLT</span>'}</td>
+          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.buff.avgH)}h</td><td class="num">${s.buff.eligible ? `<span class="mult ${multCls(s.buff.mult)}" data-tip="horas ${fmtMult(s.buff.hMult)} · ${s.buff.worked} dias ${fmtMult(s.buff.dMult)}">${fmtMult(s.buff.mult)}</span>` : '<span class="muted">CLT</span>'}</td>
           <td class="num money">${canSee(p) ? (s.pay == null ? 'fixo' : fmtBRL(s.pay)) : '•••'}</td></tr>`).join('')}</tbody>
         ${admin ? `<tfoot><tr><td>Total</td><td class="num">${tot.cards}</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td></td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>` : ''}
       </table></div>
@@ -560,10 +582,10 @@ function cfgList(key, title, sub, fields, opts = {}) {
 }
 function cfgPontos() {
   const st = S.settings;
-  const tiers = [...st.buff].sort((a, b) => a.h - b.h).map((t, i, arr) => `<div class="tier" style="--lvl:${i}">
-    <span>a partir de</span><label><input type="number" min="0" step="0.5" data-tier="${i}|h" value="${t.h}">h/dia</label>
-    <label class="tm">×<input type="number" min="0" step="0.05" data-tier="${i}|mult" value="${t.mult}"></label>
-    ${arr.length > 1 && i > 0 ? `<button class="tier-x" data-del-tier="${i}" aria-label="remover faixa">${ico('x')}</button>` : ''}</div>`).join('');
+  const tierRows = (key, f, unit, step) => [...(st[key] || [])].sort((a, b) => a[f] - b[f]).map((t, i, arr) => `<div class="tier" style="--lvl:${i}">
+    <span>a partir de</span><label><input type="number" min="0" step="${step}" data-tier="${key}|${i}|${f}" value="${t[f]}">${unit}</label>
+    <label class="tm">×<input type="number" min="0" step="0.05" data-tier="${key}|${i}|mult" value="${t.mult}"></label>
+    ${arr.length > 1 && i > 0 ? `<button class="tier-x" data-del-tier="${key}|${i}" aria-label="remover faixa">${ico('x')}</button>` : ''}</div>`).join('');
   return `<div class="grid-pts">
     <div class="col">
       ${cfgList('kinds', 'Tipos de atividade', 'pontuação base', ['color', 'hint', 'pts'], { removable: true, addable: true, addLabel: 'Novo tipo', keep: ['logo'] })}
@@ -576,9 +598,11 @@ function cfgPontos() {
     <div class="col">
       <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>base de cálculo, sem buff</span></div>
         <label class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"></label></div>
-      <div class="card"><div class="c-head"><h3>Faixas de buff</h3><span>PJ · média diária de horas no mês (dias corridos)</span></div>
-        <div class="tiers">${tiers}</div><button class="btn line sm" data-add-tier>${ico('plus')}Faixa</button>
-        <p class="muted small">Remuneração = pts validados × ${fmtBRL(st.pointValue)} × buff.</p></div>
+      <div class="card"><div class="c-head"><h3>Buff por horas</h3><span>PJ · média diária de horas no mês (dias corridos)</span></div>
+        <div class="tiers">${tierRows('buff', 'h', 'h/dia', 0.5)}</div><button class="btn line sm" data-add-tier="buff">${ico('plus')}Faixa</button></div>
+      <div class="card"><div class="c-head"><h3>Buff por dias</h3><span>PJ · dias com horas registradas no mês</span></div>
+        <div class="tiers">${tierRows('buffDays', 'd', 'dias', 1)}</div><button class="btn line sm" data-add-tier="buffDays">${ico('plus')}Faixa</button>
+        <p class="muted small">A faixa de 30 dias vale como mês completo em meses mais curtos.<br>Remuneração = pts validados × ${fmtBRL(st.pointValue)} × buff horas × buff dias.</p></div>
     </div>
   </div>`;
 }
@@ -684,6 +708,14 @@ function saveCardFromForm(form, existing) {
 
 function bind() {
   document.addEventListener('pointerdown', ripple);
+  const GLASS = '.btn, .seg, .stepper, .icon-btn, .today-btn, .ab, .who, .select-pill, .search, .fab, .tile span, .pill span, .qt, .rail-nav button, .x, .summary>div, .kpi, .buff-card, .person, .alert-bar, .bt';
+  document.addEventListener('pointermove', e => {
+    const g = e.target.closest && e.target.closest(GLASS); if (!g) return;
+    const r = g.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    g.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); g.style.setProperty('--my', (y * 100).toFixed(1) + '%');
+    if (g.id === 'fab') { g.style.setProperty('--tx', ((x - .5) * 10).toFixed(1) + 'px'); g.style.setProperty('--ty', ((y - .5) * 10).toFixed(1) + 'px'); }
+  }, { passive: true });
+  $('#fab').addEventListener('pointerleave', e => { e.currentTarget.style.setProperty('--tx', '0px'); e.currentTarget.style.setProperty('--ty', '0px'); });
   document.addEventListener('click', e => {
     const t = e.target; let el;
     if ((el = t.closest('[data-step]'))) { const [id, d] = el.dataset.step.split('|'), inp = el.closest('form').elements['add_' + id]; inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + +d); inp.classList.remove('bump'); void inp.offsetWidth; inp.classList.add('bump'); refreshReceipt(el.closest('form')); return; }
@@ -695,7 +727,7 @@ function bind() {
     if ((el = t.closest('[data-rshift]'))) { const n = +el.dataset.rshift; ui.day = n ? addDays(ui.day, 7 * n) : new Date(); ui.enter = true; render(); return; }
     if ((el = t.closest('[data-status]'))) { ui.status = el.dataset.status; render(); return; }
     if ((el = t.closest('[data-cfg]'))) { ui.cfg = el.dataset.cfg; ui.enter = true; render(); return; }
-    if (t.closest('[data-new-card]')) { openNew(); return; }
+    if ((el = t.closest('[data-new-card]'))) { openNew(el.id === 'fab'); return; }
     if ((el = t.closest('[data-more]'))) { ui.limit[el.dataset.more] = (ui.limit[el.dataset.more] || 25) + 50; render(); return; }
     if ((el = t.closest('[data-hours]'))) { e.stopPropagation(); openHours(el.dataset.hours); return; }
     if ((el = t.closest('[data-approve-all]'))) {
@@ -728,8 +760,8 @@ function bind() {
       save(); render(); toast('Criado'); return;
     }
     if ((el = t.closest('[data-cl-del]'))) { const [key, i] = el.dataset.clDel.split('|'); if (!confirm('Remover esta opção? Cards antigos mantêm os pontos que têm.')) return; S.settings[key].splice(+i, 1); save(); render(); return; }
-    if (t.closest('[data-add-tier]')) { const l = [...S.settings.buff].sort((a, b) => a.h - b.h).pop() || { h: 0, mult: 1 }; S.settings.buff.push({ h: l.h + 2, mult: Math.round((l.mult + .5) * 100) / 100 }); save(); render(); return; }
-    if ((el = t.closest('[data-del-tier]'))) { const s = [...S.settings.buff].sort((a, b) => a.h - b.h); s.splice(+el.dataset.delTier, 1); S.settings.buff = s; save(); render(); return; }
+    if ((el = t.closest('[data-add-tier]'))) { const k = el.dataset.addTier, f = k === 'buff' ? 'h' : 'd', l = [...S.settings[k]].sort((a, b) => a[f] - b[f]).pop() || { [f]: 0, mult: 1 }; S.settings[k].push({ [f]: l[f] + (k === 'buff' ? 2 : 3), mult: Math.round((l.mult + (k === 'buff' ? .5 : .1)) * 100) / 100 }); save(); render(); return; }
+    if ((el = t.closest('[data-del-tier]'))) { const [k, i] = el.dataset.delTier.split('|'), f = k === 'buff' ? 'h' : 'd', s = [...S.settings[k]].sort((a, b) => a[f] - b[f]); s.splice(+i, 1); S.settings[k] = s; save(); render(); return; }
     if ((el = t.closest('[data-io]'))) { io(el.dataset.io); return; }
   });
 
@@ -757,7 +789,7 @@ function bind() {
       if (f === 'pts') { const v = parseFloat(t.value); if (!isNaN(v) && v >= 0) item.pts = v; } else item[f] = t.value;
       save(); if (f === 'color') render(); else toast('Atualizado'); return;
     }
-    if (t.matches('[data-tier]')) { const [i, f] = t.dataset.tier.split('|'), s = [...S.settings.buff].sort((a, b) => a.h - b.h), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings.buff = s; save(); render(); toast('Buff atualizado'); return; }
+    if (t.matches('[data-tier]')) { const [k, i, f] = t.dataset.tier.split('|'), sf = k === 'buff' ? 'h' : 'd', s = [...S.settings[k]].sort((a, b) => a[sf] - b[sf]), v = parseFloat(t.value); if (isNaN(v) || v < 0) return; s[+i][f] = v; S.settings[k] = s; save(); render(); toast('Buff atualizado'); return; }
     if (t.closest('[data-cardform]')) { if (t.name === 'designerId' && actCtx && actCtx.mode === 'new') { const dlst = $('#clientList'); if (dlst) dlst.innerHTML = clientOpts(t.value); } refreshReceipt(t.closest('form')); }
   });
 
@@ -768,7 +800,7 @@ function bind() {
 
   document.addEventListener('keydown', e => {
     if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (ui.view !== 'atividades' || $('dialog[open]') || e.target.closest('input, textarea, select, [contenteditable]')) return;
+    if (ui.view === 'config' || !designers().length || $('dialog[open]') || e.target.closest('input, textarea, select, [contenteditable]')) return;
     e.preventDefault(); openNew();
   });
 
