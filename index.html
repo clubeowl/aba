@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=7">
+<link rel="stylesheet" href="css/style.css?v=9">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
   <aside class="rail" aria-label="Menu">
     <div class="rail-logo" title="Dedé · SeuBoné"><img src="img/seubone-simbolo.png" alt="SeuBoné"></div>
     <nav class="rail-nav" id="nav"></nav>
-    <div class="rail-foot"><b>Dedé</b><span>v3</span></div>
+    <div class="rail-foot"><b>Dedé</b><span>v5</span></div>
   </aside>
 
   <div class="shell">
@@ -28,7 +28,7 @@
       <div class="me" id="me"></div>
     </header>
     <main id="main"></main>
-    <footer class="foot"><img src="img/seubone-logo-escuro.png" alt="SeuBoné"><span>Dedé · modo demonstração · os dados ficam salvos só neste navegador</span></footer>
+    <footer class="foot"><img src="img/seubone-logo-escuro.png" alt="SeuBoné"><span>Dedé · ambiente de demonstração · os dados ficam salvos apenas neste navegador · valores exibidos são estimativas e dependem da validação da gestão</span></footer>
   </div>
 </div>
 
@@ -67,7 +67,12 @@
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <div id="toast" role="status"></div>
 
-<script src="js/store.js?v=7"></script>
-<script src="js/app.js?v=7"></script>
+<button class="fab off" id="fab" data-new-card aria-label="Registrar card">
+  <span class="fab-glow" aria-hidden="true"></span>
+  <svg class="fab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+  <span class="fab-tip">Registrar card <kbd>N</kbd></span>
+</button>
+<script src="js/store.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 </body>
 </html>

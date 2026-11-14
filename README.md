@@ -10,7 +10,7 @@ Admin e designers usam **as mesmas telas**. O admin só ganha o menu **Configura
 
 | Menu | Quem vê | O que tem |
 |---|---|---|
-| **Atividades** | todos | Indicadores do período (pontuação validada, em revisão, horas registradas, Buff e remuneração prevista), o botão **Registrar card** no topo (atalho **N**, no celular é o botão amarelo flutuante), que abre uma janela com o recibo de pontos calculado na hora, e a lista de cards de cada designer. O admin valida, solicita ajuste, reprova, edita, ajusta pontos e registra as horas. |
+| **Atividades** | todos | Indicadores do período (pontuação validada, em revisão, horas registradas, Buff e remuneração prevista), o botão **+** no canto inferior direito (atalho **N**), que abre uma janela com o recibo de pontos calculado na hora, e a lista de cards de cada designer. O admin valida, solicita ajuste, reprova, edita, ajusta pontos e registra as horas. |
 | **Ranking** | todos | Pódio da semana e do mês (o mês já conta o Buff) e a área **Buff** com a média de horas por dia de cada PJ e quanto falta para a próxima faixa. |
 | **Métricas** | todos | Gasto, pontos, horas, rankings (tempo online, cards, cards difíceis), gráfico por dia, pontos por tipo de atividade e a tabela de fechamento com exportação para o Excel. O designer não vê quanto os outros recebem. |
 | **Configurações** | só admin | Equipe, Pontuação (tipos, logo recebida, adicionais, dificuldade, valor do ponto e faixas do Buff), Horas online e Dados. |
@@ -42,15 +42,29 @@ Dificuldade (leve, moderado, difícil) não muda os pontos: vira a linha azul, a
 
 ## Buff (só PJ)
 
-Média de horas online por dia **no mês, contando fins de semana**:
+São dois fatores que se multiplicam.
 
-| Média por dia | Buff nos pontos do mês |
+**Horas:** média de horas registradas por dia no mês, **contando fins de semana**.
+
+| Média por dia | Fator |
 |---|---|
-| menos de 8h | sem buff |
+| menos de 8h | ×1,0 |
 | de 8h a 12h | ×1,5 |
 | mais de 12h | ×2,0 |
 
-**A receber** = pontos aprovados × valor do ponto (R$ 3,00) × Buff.
+**Dias trabalhados:** dias do mês com horas registradas.
+
+| Dias no mês | Fator |
+|---|---|
+| até 20 | ×1,0 |
+| 21 a 29 | ×1,1 |
+| 30 (ou o mês inteiro, em meses mais curtos) | ×1,2 |
+
+Exemplo: 9h/dia de média (×1,5) e 24 dias trabalhados (×1,1) = Buff ×1,65.
+
+As faixas dos dois fatores ficam em Configurações → Pontuação.
+
+**Remuneração prevista** = pontos validados × valor do ponto (R$ 3,00) × Buff de horas × Buff de dias.
 
 ## Publicar no GitHub Pages
 
