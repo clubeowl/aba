@@ -193,7 +193,7 @@ function summary(ppl, from, to) {
   if (one) {
     const b = one.s.buff;
     buffCell = b.eligible
-      ? `<div class="sm-buff ${multCls(b.mult)}"><span>Buff · ${MONTHL(parseKey(to))}${hint(buffTip())}</span><b>${fmtMult(b.mult)}</b><small>horas ${fmtMult(b.hMult)} · dias ${fmtMult(b.dMult)} (${b.worked}/${b.monthDays})</small></div>`
+      ? `<div class="sm-buff ${multCls(b.mult)}"><span>Buff · ${MONTHL(parseKey(to))}${hint(buffTip())}</span><b>${fmtMult(b.mult)}</b><small>média ${fmtNum(b.avgH)}h/dia${b.next ? ` · +${fmtNum(b.next.h - b.avgH)}h p/ ${fmtMult(b.next.mult)}` : ' · faixa máxima'}</small></div>`
       : `<div class="sm-buff"><span>Buff${hint(buffTip())}</span><b>—</b><small>aplicável apenas a PJ</small></div>`;
   } else {
     const pj = st.filter(x => x.s.buff.eligible), on = pj.filter(x => x.s.buff.mult > 1).length;
@@ -276,12 +276,9 @@ function receipt(c, opts = {}) {
   </aside>`;
 }
 const clientOpts = did => [...new Set(S.activities.filter(a => a.designerId === did && a.client).slice(-120).map(a => a.client))].map(x => `<option value="${esc(x)}">`).join('');
-function tierText(arr, f, unit) {
-  const t = [...(arr || [])].sort((a, b) => a[f] - b[f]);
-  return t.map((x, i) => (t[i + 1] ? (x[f] ? `${x[f]}–${t[i + 1][f] - (f === 'd' ? 1 : 0)}${unit}` : `até ${t[i + 1][f] - (f === 'd' ? 1 : 0)}${unit}`) : `${x[f]}${unit}${f === 'd' ? '' : '+'}`) + ' ' + fmtMult(x.mult)).join(' · ');
-}
 function buffTip() {
-  return `Multiplicador mensal aplicável a PJ, resultado de dois fatores. Horas (média por dia no mês, contando fins de semana): ${tierText(S.settings.buff, 'h', 'h')}. Dias trabalhados no mês: ${tierText(S.settings.buffDays, 'd', ' dias')}. Os fatores se multiplicam.`;
+  const t = S.settings.buff.slice().sort((a, b) => a.h - b.h);
+  return `Multiplicador mensal aplicável a PJ. Média de horas por dia no mês, contando todos os dias corridos (inclusive fins de semana): ${t.map((x, i) => (t[i + 1] ? (x.h ? `${x.h}–${t[i + 1].h}h` : `até ${t[i + 1].h}h`) : `acima de ${x.h}h`) + ' ' + fmtMult(x.mult)).join(' · ')}.`;
 }
 function newDesigner() {
   if (!isAdmin()) return me().id;
@@ -353,7 +350,7 @@ function block(p, from, to, idx) {
         <span class="chip"><small>Validados</small><b>${fmtPts(s.points)}</b></span>
         ${pendN ? `<span class="chip warn"><small>Em revisão</small><b>${pendN}</b></span>` : ''}
         <${admin ? 'button' : 'span'} class="chip ${admin ? 'edit' : ''}" ${admin ? `data-hours="${p.id}" data-tip="Registrar horas"` : ''}><small>Horas</small><b>${fmtDur(s.minutes)}</b>${admin ? ico('clock', 'mini') : ''}</${admin ? 'button' : 'span'}>
-        <span class="chip buff ${multCls(b.mult)}" ${b.eligible ? `data-tip="${MONTHL(parseKey(to))}: ${fmtNum(b.avgH)}h/dia ${fmtMult(b.hMult)} · ${b.worked} dias ${fmtMult(b.dMult)}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>
+        <span class="chip buff ${multCls(b.mult)}" ${b.eligible ? `data-tip="${fmtNum(b.avgH)}h/dia em ${MONTHL(parseKey(to))}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>
       </div>
       ${admin && pendN ? `<button class="btn ok sm" data-approve-all="${p.id}">${ico('check')}Validar ${pendN}</button>` : ''}
       ${one ? '' : `<span class="b-chev">${ico('chev')}</span>`}
@@ -441,34 +438,21 @@ function board(title, sub, list, monthly) {
 function buffArea(mFrom) {
   const tiers = [...S.settings.buff].sort((a, b) => a.h - b.h);
   const maxH = Math.max(14, (tiers[tiers.length - 1]?.h || 12) + 2);
-  const dTiers = [...(S.settings.buffDays || [])].sort((a, b) => a.d - b.d);
   const pjs = designers().filter(p => p.regime === 'PJ');
   const cards = pjs.map((p, i) => {
     const b = monthBuff(p.id, mFrom);
     const pct = Math.min(100, b.avgH / maxH * 100);
     return `<div class="buff-card ${multCls(b.mult)} ${p.id === me().id ? 'me' : ''}" style="--pc:${p.color};--i:${i}">
-      <div class="bc-top">${avatar(p, 'md')}<div><b>${esc(p.name)}</b><small>${fmtDur(b.minutes)} no mês · ${fmtMult(b.hMult)} × ${fmtMult(b.dMult)}</small></div><span class="bc-mult">${ico('bolt')}${fmtMult(b.mult)}</span></div>
-      <div class="bc-factors">
-        <div class="bc-f">
-          <div class="bc-avg"><b>${fmtNum(b.avgH)}</b><span>h/dia · média</span><em class="bc-fx">${fmtMult(b.hMult)}</em></div>
-          <div class="bc-track"><i class="bc-fill" style="--w:${pct}%"></i>${tiers.filter(t => t.h > 0).map(t => `<span class="bc-mark" style="left:${t.h / maxH * 100}%"><em>${t.h}h</em></span>`).join('')}</div>
-          <p class="bc-msg">${b.next ? `+<b>${fmtNum(b.next.h - b.avgH)}h/dia</b> para ${fmtMult(b.next.mult)}` : 'Faixa máxima'}</p>
-        </div>
-        <div class="bc-f">
-          <div class="bc-avg"><b>${b.worked}</b><span>de ${b.monthDays} dias trabalhados</span><em class="bc-fx">${fmtMult(b.dMult)}</em></div>
-          <div class="bc-track days"><i class="bc-fill" style="--w:${Math.min(100, b.worked / b.monthDays * 100)}%"></i>${dTiers.filter(t => t.d > 0).map(t => `<span class="bc-mark" style="left:${Math.min(t.d, b.monthDays) / b.monthDays * 100}%"><em>${Math.min(t.d, b.monthDays)}d</em></span>`).join('')}</div>
-          <p class="bc-msg">${b.nextDays ? `+<b>${b.nextDays.need - b.worked} ${b.nextDays.need - b.worked === 1 ? 'dia' : 'dias'}</b> para ${fmtMult(b.nextDays.mult)}` : 'Faixa máxima'}</p>
-        </div>
-      </div>
+      <div class="bc-top">${avatar(p, 'md')}<div><b>${esc(p.name)}</b><small>${fmtDur(b.minutes)} em ${b.days} dias</small></div><span class="bc-mult">${ico('bolt')}${fmtMult(b.mult)}</span></div>
+      <div class="bc-avg"><b>${fmtNum(b.avgH)}</b><span>h/dia · média do mês</span></div>
+      <div class="bc-track"><i class="bc-fill" style="--w:${pct}%"></i>${tiers.filter(t => t.h > 0).map(t => `<span class="bc-mark" style="left:${t.h / maxH * 100}%"><em>${t.h}h · ${fmtMult(t.mult)}</em></span>`).join('')}</div>
+      <p class="bc-msg">${b.next ? `+<b>${fmtNum(b.next.h - b.avgH)}h/dia</b> de média para atingir ${fmtMult(b.next.mult)}` : 'Faixa máxima atingida'}</p>
     </div>`;
   }).join('');
   return `<div class="buff-area">
     <div class="buff-head">
-      <div><h2>Buff · ${MESL[mFrom.getMonth()]}</h2><p>Multiplicador da pontuação mensal (PJ), composto por dois fatores que se multiplicam: <b>média de horas por dia</b> (dias corridos, incluindo fins de semana) e <b>dias trabalhados no mês</b> (dias com horas registradas).</p></div>
-      <div class="buff-tiers-wrap">
-        <div class="bt-group"><small>Horas / dia</small><div class="buff-tiers">${tiers.map((t, i) => `<div class="bt ${multCls(t.mult)}"><span>${i === 0 ? `até ${tiers[1]?.h ?? '—'}h` : i === tiers.length - 1 ? `${t.h}h+` : `${t.h}–${tiers[i + 1].h}h`}</span><b>${fmtMult(t.mult)}</b></div>`).join('')}</div></div>
-        <div class="bt-group"><small>Dias trabalhados</small><div class="buff-tiers">${dTiers.map((t, i) => `<div class="bt"><span>${i === 0 ? `até ${(dTiers[1]?.d ?? 1) - 1} dias` : i === dTiers.length - 1 ? `${t.d} dias` : `${t.d}–${dTiers[i + 1].d - 1} dias`}</span><b>${fmtMult(t.mult)}</b></div>`).join('')}</div></div>
-      </div>
+      <div><h2>Buff · ${MESL[mFrom.getMonth()]}</h2><p>Multiplicador aplicado à pontuação mensal conforme a média de horas registradas por dia. Base de cálculo: <b>todos os dias corridos do mês, incluindo fins de semana</b>. Aplicável a PJ.</p></div>
+      <div class="buff-tiers">${tiers.map((t, i) => `<div class="bt ${multCls(t.mult)}"><span>${i === 0 ? `menos de ${tiers[1]?.h ?? '—'}h/dia` : i === tiers.length - 1 ? `mais de ${t.h}h/dia` : `${t.h}h a ${tiers[i + 1].h}h/dia`}</span><b>${fmtMult(t.mult)}</b></div>`).join('')}</div>
     </div>
     ${pjs.length ? `<div class="buff-grid">${cards}</div>` : '<div class="empty-card">Nenhum designer PJ cadastrado.</div>'}
   </div>`;
@@ -514,7 +498,7 @@ function viewMetricas() {
           <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
           <td class="num">${s.cards}</td><td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending || '—'}</td>
           <td class="num">${fmtNum(s.ptsPerCard)}</td><td class="num">${s.avgCardMins ? fmtDur(s.avgCardMins) : '—'}</td><td class="num">${s.hard || '—'}</td>
-          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.buff.avgH)}h</td><td class="num">${s.buff.eligible ? `<span class="mult ${multCls(s.buff.mult)}" data-tip="horas ${fmtMult(s.buff.hMult)} · ${s.buff.worked} dias ${fmtMult(s.buff.dMult)}">${fmtMult(s.buff.mult)}</span>` : '<span class="muted">CLT</span>'}</td>
+          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.buff.avgH)}h</td><td class="num">${s.buff.eligible ? `<span class="mult ${multCls(s.buff.mult)}">${fmtMult(s.buff.mult)}</span>` : '<span class="muted">CLT</span>'}</td>
           <td class="num money">${canSee(p) ? (s.pay == null ? 'fixo' : fmtBRL(s.pay)) : '•••'}</td></tr>`).join('')}</tbody>
         ${admin ? `<tfoot><tr><td>Total</td><td class="num">${tot.cards}</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td></td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>` : ''}
       </table></div>
@@ -598,11 +582,9 @@ function cfgPontos() {
     <div class="col">
       <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>base de cálculo, sem buff</span></div>
         <label class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"></label></div>
-      <div class="card"><div class="c-head"><h3>Buff por horas</h3><span>PJ · média diária de horas no mês (dias corridos)</span></div>
-        <div class="tiers">${tierRows('buff', 'h', 'h/dia', 0.5)}</div><button class="btn line sm" data-add-tier="buff">${ico('plus')}Faixa</button></div>
-      <div class="card"><div class="c-head"><h3>Buff por dias</h3><span>PJ · dias com horas registradas no mês</span></div>
-        <div class="tiers">${tierRows('buffDays', 'd', 'dias', 1)}</div><button class="btn line sm" data-add-tier="buffDays">${ico('plus')}Faixa</button>
-        <p class="muted small">A faixa de 30 dias vale como mês completo em meses mais curtos.<br>Remuneração = pts validados × ${fmtBRL(st.pointValue)} × buff horas × buff dias.</p></div>
+      <div class="card"><div class="c-head"><h3>Faixas de buff</h3><span>PJ · média diária de horas no mês (dias corridos)</span></div>
+        <div class="tiers">${tierRows('buff', 'h', 'h/dia', 0.5)}</div><button class="btn line sm" data-add-tier="buff">${ico('plus')}Faixa</button>
+        <p class="muted small">Remuneração = pts validados × ${fmtBRL(st.pointValue)} × buff.</p></div>
     </div>
   </div>`;
 }
