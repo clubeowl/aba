@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
   <aside class="rail" aria-label="Menu">
     <div class="rail-logo" title="Dedé · SeuBoné"><img src="img/seubone-simbolo.png" alt="SeuBoné"></div>
     <nav class="rail-nav" id="nav"></nav>
-    <div class="rail-foot"><b>Dedé</b><span>v5</span></div>
+    <div class="rail-foot"><b>Dedé</b><span>v6</span></div>
   </aside>
 
   <div class="shell">
@@ -67,12 +67,11 @@
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 <div id="toast" role="status"></div>
 
-<button class="fab off" id="fab" data-new-card aria-label="Registrar card">
-  <span class="fab-glow" aria-hidden="true"></span>
-  <svg class="fab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-  <span class="fab-tip">Registrar card <kbd>N</kbd></span>
+<button class="fab off" id="fab" data-new-card aria-label="Registrar card" title="Registrar card (N)">
+  <span class="fab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg></span>
+  <span class="fab-label">Registrar card</span>
 </button>
-<script src="js/store.js?v=10"></script>
-<script src="js/app.js?v=10"></script>
+<script src="js/store.js?v=13"></script>
+<script src="js/app.js?v=13"></script>
 </body>
 </html>

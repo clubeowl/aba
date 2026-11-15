@@ -10,10 +10,10 @@ Admin e designers usam **as mesmas telas**. O admin só ganha o menu **Configura
 
 | Menu | Quem vê | O que tem |
 |---|---|---|
-| **Atividades** | todos | Indicadores do período (pontuação validada, em revisão, horas registradas, Buff e remuneração prevista), o botão **+** no canto inferior direito (atalho **N**), que abre uma janela com o recibo de pontos calculado na hora, e a lista de cards de cada designer. O admin valida, solicita ajuste, reprova, edita, ajusta pontos e registra as horas. |
-| **Ranking** | todos | Pódio da semana e do mês (o mês já conta o Buff) e a área **Buff** com a média de horas por dia de cada PJ e quanto falta para a próxima faixa. |
+| **Atividades** | todos | Indicadores do período (pontuação validada, em revisão, horas registradas e a receber), o botão **+** no canto inferior direito (atalho **N**), que abre uma janela com o recibo de pontos calculado na hora, e a lista de cards de cada designer. O admin valida, solicita ajuste, reprova, edita, ajusta pontos e registra as horas. |
+| **Ranking** | todos | Pódio da semana e do mês, por pontuação validada. |
 | **Métricas** | todos | Gasto, pontos, horas, rankings (tempo online, cards, cards difíceis), gráfico por dia, pontos por tipo de atividade e a tabela de fechamento com exportação para o Excel. O designer não vê quanto os outros recebem. |
-| **Configurações** | só admin | Equipe, Pontuação (tipos, logo recebida, adicionais, dificuldade, valor do ponto e faixas do Buff), Horas online e Dados. |
+| **Configurações** | só admin | Equipe, Pontuação (tipos, logo recebida, adicionais, dificuldade e valor do ponto), Horas online e Dados. |
 
 ## O card
 
@@ -40,17 +40,11 @@ Dificuldade (leve, moderado, difícil) não muda os pontos: vira a linha azul, a
 
 **Status:** Em revisão → Validado (entra no valor), Ajuste solicitado (volta com parecer) ou Reprovado.
 
-## Buff (só PJ)
+## Buff
 
-Média de horas registradas por dia **no mês, contando todos os dias corridos (inclusive fins de semana)**:
+Desativado por enquanto. Para religar, troque `BUFF_ON` para `true` no início de `js/store.js`: o cálculo e as telas voltam juntos.
 
-| Média por dia | Buff nos pontos do mês |
-|---|---|
-| menos de 8h | ×1,0 |
-| de 8h a 12h | ×1,5 |
-| mais de 12h | ×2,0 |
-
-**Remuneração prevista** = pontos validados × valor do ponto (R$ 3,00) × Buff.
+**A receber** = pontos validados × valor do ponto (R$ 3,00).
 
 ## Publicar no GitHub Pages
 
