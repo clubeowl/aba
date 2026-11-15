@@ -1631,3 +1631,11 @@ fieldset.cp-grid.dlg .receipt{position:sticky;top:0}
 .c-client{font-weight:500;color:var(--ink-3)}
 @media (max-width:1320px){ .cards{--cols:70px minmax(150px,1.5fr) minmax(100px,.8fr) 160px 62px 112px 118px 96px} }
 @media (max-width:860px){ .cards{--cols:minmax(0,1fr) auto auto} .c-card{display:flex!important} .c-client{display:none!important} }
+/* corrige regras antigas de ≤1280px que jogavam o status para baixo do card */
+.crow>div{grid-column:auto!important}
+.crow{row-gap:0!important}
+.cards{--cols:74px 54px minmax(170px,1.6fr) minmax(110px,.8fr) 170px 116px 66px 62px 118px 124px 124px}
+@media (max-width:1320px){ .cards{--cols:70px minmax(150px,1.5fr) minmax(100px,.8fr) 160px 62px 112px 124px 124px} }
+@media (max-width:860px){ .cards{--cols:minmax(0,1fr) auto auto} }
+.c-actions{gap:3px}
+.c-actions .ab{margin-left:0}
