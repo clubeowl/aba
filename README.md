@@ -17,7 +17,7 @@ Admin e designers usam **as mesmas telas**. O admin só ganha o menu **Configura
 
 ## O card
 
-Designer · dia · hora · cliente · nome do card · nº do lulu · tipo de atividade · logo recebida · adicionais · dificuldade · tempo gasto · detalhes da pontuação · pontos · valor.
+Designer · dia · hora · nome do card · vendedor · link do Lulu · tipo de atividade · logo recebida · adicionais · dificuldade · tempo gasto · observações · pontos · valor.
 
 | Tipo de atividade | Pontos |
 |---|---|
@@ -39,6 +39,19 @@ Adicionais (cada um): variação da logo +0,5 · mudança na logo +0,5 · mudan�
 Dificuldade (leve, moderado, difícil) não muda os pontos: vira a linha azul, amarela ou vermelha do card.
 
 **Status:** Em revisão → Validado (entra no valor), Ajuste solicitado (volta com parecer) ou Reprovado.
+
+## Puxar o card do Lulu
+
+Os cards do Lulu não têm link próprio e os dados ficam atrás do login, então o Dedé não consegue lê-los sozinho. Para isso existe o botão **Enviar pro Dedé**:
+
+1. Abra **Registrar card** no Dedé e arraste o botão amarelo **Enviar pro Dedé** para a barra de favoritos do Chrome (só uma vez).
+2. No Lulu (Pipe Design), clique no favorito e depois no card.
+3. O Dedé abre com a janela já preenchida: nome do card, vendedor (quem criou o card), pedido, dia e hora do início da discussão. O resto o designer só marca; digitar, só nas observações, se precisar.
+
+O botão só lê a tela do Lulu; não altera nada lá. O código está em `tools/lulu-bookmarklet.js`.
+
+O Dedé também aceita ser aberto já preenchido por um link, caso o Lulu ganhe um botão próprio:
+`https://clubeowl.github.io/aba/#registrar?card=…&vendedor=…&pedido=…&data=2026-11-13&hora=09:25&link=…`
 
 ## Buff
 
