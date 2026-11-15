@@ -68,7 +68,7 @@ const round2 = n => Math.round(n * 100) / 100;
 /* ---------- estado ----------
    people: [{id, name, role:'admin'|'designer', regime:'CLT'|'PJ'|'ADM', color, email, payByPoints}]
    activities (cards): [{
-     id, designerId, date, time, client, name (nome do card), luluLink (link do card no Lulu), luluId,
+     id, designerId, date, time, seller (vendedor), name (nome do card), luluLink, luluId, client (legado),
      kind, logoQ, adds:{variacao, mud_logo, mud_layout}, diff, mins, details,
      pts (pontuação final), ptsOverride (true se a gestão ajustou),
      status:'pendente'|'aprovada'|'erro'|'recusada', note (comentário da gestão), createdAt, by }]
@@ -193,10 +193,10 @@ function stats(pid, from, to) {
 function receiveFromLulu(payload) {
   const list = Array.isArray(payload) ? payload : [payload], out = [], now = new Date();
   for (const p of list) {
-    if (!p || !p.cliente) continue;
+    if (!p || !(p.nome || p.cliente)) continue;
     const who = S.people.find(x => x.role === 'designer' && [norm(x.name), norm(x.email)].includes(norm(p.designer)));
     if (!who) continue;
-    const c = { id: uid(), designerId: who.id, date: dkey(now), time: hm(now), client: String(p.cliente), name: p.nome || '', luluLink: p.link || '', luluId: p.lulu_id ? String(p.lulu_id) : '', kind: p.tipo || 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: 'veio do lulu', status: 'pendente', note: '', createdAt: now.toISOString(), by: 'lulu' };
+    const c = { id: uid(), designerId: who.id, date: dkey(now), time: hm(now), client: String(p.cliente), seller: p.vendedor || '', name: p.nome || '', luluLink: p.link || '', luluId: p.lulu_id ? String(p.lulu_id) : '', kind: p.tipo || 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: 'veio do lulu', status: 'pendente', note: '', createdAt: now.toISOString(), by: 'lulu' };
     c.pts = scoreOf(c).total; S.activities.push(c); out.push(c);
   }
   return out;
@@ -236,7 +236,7 @@ function demoState() {
         const adds = { variacao: kind === 'logo' ? pick([0, 1, 2, 2, 3]) : 0, mud_logo: rnd() < .2 ? 1 : 0, mud_layout: rnd() < .25 ? R(1, 2) : 0 };
         const diff = kind === 'grande' || kind === 'media' ? 'dificil' : pick(['leve', 'leve', 'moderado', 'moderado', 'dificil']);
         const st = dkey(d) === dkey(today) ? (rnd() < .65 ? 'pendente' : 'aprovada') : (rnd() < .93 ? 'aprovada' : rnd() < .5 ? 'erro' : 'recusada');
-        const c = { id: uid(), designerId: p.id, date: k, time: `${pad(h)}:${pad(m)}`, client: `${pick(A)} ${pick(B)}`, name: pick(N), luluId: String(47000 + R(0, 2000)), kind, logoQ, adds, diff, mins: kind === 'logo' ? R(15, 70) : kind === 'catalogo' ? R(60, 150) : R(120, 420), details: rnd() < .15 ? 'Não mexi na logo, mas refiz os layouts do zero.' : '', status: st, note: st === 'erro' ? 'Confere a qualidade da logo, parecia alta.' : st === 'recusada' ? 'Card duplicado' : '', createdAt: t.toISOString(), by: 'designer' };
+        const c = { id: uid(), designerId: p.id, date: k, time: `${pad(h)}:${pad(m)}`, client: '', seller: pick(['Victor Clemerson', 'Camila Rocha', 'Diego Freitas', 'Larissa Brito', 'Rafael Nunes']), name: `${pick(A)} ${pick(B)} ${R(1000, 9999)} +30 ${pick(['Com Logo', 'Sem Logo'])} (${pick(['Turismo', 'Mercado Imobiliário', 'Outros', 'Saúde', 'Varejo', 'Educação'])})`, luluId: '', kind, logoQ, adds, diff, mins: kind === 'logo' ? R(15, 70) : kind === 'catalogo' ? R(60, 150) : R(120, 420), details: rnd() < .15 ? 'Não mexi na logo, mas refiz os layouts do zero.' : '', status: st, note: st === 'erro' ? 'Confere a qualidade da logo, parecia alta.' : st === 'recusada' ? 'Card duplicado' : '', createdAt: t.toISOString(), by: 'designer' };
         c.pts = scoreOf(c).total;
         S.activities.push(c);
       }

@@ -169,7 +169,7 @@ function viewAtividades() {
     ${summary(ppl, from, to)}
     <div class="filters">
       ${isAdmin() ? `<label class="select-pill">${ico('users')}<select data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${ico('chev')}</label>` : ''}
-      <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, link do Lulu…" value="${esc(ui.q)}" data-q></label>
+      <label class="search">${ico('search')}<input type="search" placeholder="Buscar card, vendedor…" value="${esc(ui.q)}" data-q></label>
     </div>
     <div id="blocks">${ppl.map((p, i) => block(p, from, to, i)).join('')}</div>
   </section>`;
@@ -224,7 +224,7 @@ function summary(ppl, from, to) {
 }
 
 /* ---------- formulário do card (usado no lançamento e na edição) ---------- */
-const emptyCard = did => { const now = new Date(); return { designerId: did, date: dkey(ui.period === 'dia' ? ui.day : now), time: hm(now), client: '', name: '', luluId: '', kind: 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: '' }; };
+const emptyCard = did => { const now = new Date(); return { designerId: did, date: dkey(ui.period === 'dia' ? ui.day : now), time: hm(now), client: '', seller: '', name: '', luluId: '', kind: 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: '' }; };
 
 function cardFields(c, opts = {}) {
   const admin = isAdmin(), st = S.settings;
@@ -237,8 +237,8 @@ function cardFields(c, opts = {}) {
     </label>
     <p class="lulu-help">Os cards do Lulu não têm link próprio. Para puxar tudo de lá, arraste <a class="lulu-bm" href="${luluBmHref()}" data-bm>${ico('send')}Enviar pro Dedé</a> para a barra de favoritos, depois clique nele no Lulu e no card.</p>
     <div class="cf-row r-main">
-      <label class="f"><span>Cliente</span><input name="client" value="${esc(c.client)}" placeholder="Nome do cliente" list="clientList" autocomplete="off"></label>
-      <label class="f"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Trucker evento verão" autocomplete="off"></label>
+      <label class="f"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Marcelo zanoni 7612 +30 Com Logo (Turismo)" autocomplete="off"></label>
+      <label class="f"><span>Vendedor</span><input name="seller" value="${esc(c.seller || '')}" placeholder="quem criou o card no Lulu" list="clientList" autocomplete="off"></label>
     </div>
     <div class="cf-row r-meta ${admin ? 'adm' : ''}">
       ${admin ? `<label class="f"><span>Designer</span><select name="designerId">${designers().map(p => `<option value="${p.id}" ${p.id === c.designerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
@@ -277,8 +277,8 @@ function cardFields(c, opts = {}) {
       </div>
     </div>
     <div class="cf-sec">
-      <div class="cf-lbl">Justificativa da pontuação <span>opcional</span></div>
-      <textarea name="details" rows="2" placeholder="ex.: não fiz modificações na logo, mas refiz os layouts do zero">${esc(c.details || '')}</textarea>
+      <div class="cf-lbl">Observações <span>só se precisar</span></div>
+      <textarea name="details" rows="2" placeholder="ex.: não mexi na logo, mas refiz os layouts do zero">${esc(c.details || '')}</textarea>
     </div>
     </div>`;
 }
@@ -294,7 +294,7 @@ function receipt(c, opts = {}) {
     ${opts.submit || ''}
   </aside>`;
 }
-const clientOpts = did => [...new Set(S.activities.filter(a => a.designerId === did && a.client).slice(-120).map(a => a.client))].map(x => `<option value="${esc(x)}">`).join('');
+const clientOpts = did => [...new Set(S.activities.filter(a => a.seller).slice(-300).map(a => a.seller))].map(x => `<option value="${esc(x)}">`).join('');
 function buffTip() {
   const t = S.settings.buff.slice().sort((a, b) => a.h - b.h);
   return `Multiplicador mensal aplicável a PJ. Média de horas por dia no mês, contando todos os dias corridos (inclusive fins de semana): ${t.map((x, i) => (t[i + 1] ? (x.h ? `${x.h}–${t[i + 1].h}h` : `até ${t[i + 1].h}h`) : `acima de ${x.h}h`) + ' ' + fmtMult(x.mult)).join(' · ')}.`;
@@ -302,7 +302,7 @@ function buffTip() {
 /* ---------- Lulu: link do card ----------
    1) lê o que der do próprio link (parâmetros e número do card);
    2) tenta buscar o card no Lulu (só funciona se o Lulu liberar o acesso para este site);
-   3) também aceita abrir o Dedé com #registrar?link=…&cliente=…&card=…&data=…&hora=… */
+   3) também aceita abrir o Dedé com #registrar?card=…&vendedor=…&pedido=…&data=…&hora=…&link=… */
 const luluIdOf = link => { try { const u = new URL(link); const q = u.searchParams; const id = q.get('id') || q.get('card') && /^\d+$/.test(q.get('card')) && q.get('card'); if (id) return id; const m = (u.pathname + u.hash).match(/(\d{3,})(?!.*\d{3,})/); return m ? m[1] : ''; } catch (e) { return ''; } };
 function luluFromParams(q) {
   const g = (...k) => { for (const x of k) { const v = q.get(x); if (v) return v.trim(); } return ''; };
@@ -310,7 +310,7 @@ function luluFromParams(q) {
   if (/^\d{2}\/\d{2}\/\d{4}/.test(date)) { const [d, m, y] = date.split(/[\/ ]/); date = `${y}-${m}-${d}`; }
   if (!time && /T\d{2}:\d{2}/.test(date)) { time = date.slice(11, 16); }
   date = date.slice(0, 10);
-  return { client: g('cliente', 'client', 'customer'), name: g('nome', 'card', 'name', 'titulo', 'title'), date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '', time: /^\d{2}:\d{2}/.test(time) ? time.slice(0, 5) : '' };
+  return { seller: g('vendedor', 'seller', 'criado_por'), name: g('card', 'nome', 'name', 'titulo', 'title'), date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '', time: /^\d{2}:\d{2}/.test(time) ? time.slice(0, 5) : '' };
 }
 function luluFromJSON(j) {
   const flat = {}; (function walk(o, d) { if (!o || typeof o !== 'object' || d > 3) return; for (const [k, v] of Object.entries(o)) { if (v && typeof v === 'object') walk(v, d + 1); else if (!(k.toLowerCase() in flat)) flat[k.toLowerCase()] = v; } })(j, 0);
@@ -321,15 +321,15 @@ function luluFromJSON(j) {
 function luluLookup(link) {
   let u; try { u = new URL(link); } catch (e) { return { ok: false, bad: true }; }
   const d = luluFromParams(u.searchParams);
-  return { ok: !!(d.client || d.name), noCard: /(^|\.)seubone\.com$/.test(u.hostname), ...d };
+  return { ok: !!(d.seller || d.name), noCard: /(^|\.)seubone\.com$/.test(u.hostname), ...d };
 }
 function fillFromLulu(form, d, force) {
   const F = form.elements, set = (n, v) => { if (v && F[n] && (force || !F[n].value || F[n].dataset.auto)) { F[n].value = v; F[n].dataset.auto = '1'; F[n].closest('.f')?.classList.add('filled'); } };
-  set('client', d.client); set('name', d.name); set('date', d.date); set('time', d.time);
+  set('seller', d.seller); set('name', d.name); set('date', d.date); set('time', d.time);
   setTimeout(() => form.querySelectorAll('.f.filled').forEach(x => x.classList.remove('filled')), 900);
   refreshReceipt(form);
 }
-const LULU_BM = "(function () {\nvar DEDE = '__DEDE__';\nvar M = ['janeiro','fevereiro','mar\u00e7o','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];\nvar tip = document.createElement('div');\ntip.textContent = 'Ded\u00e9: clique no card que voc\u00ea quer registrar (Esc cancela)';\ntip.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483647;background:#FDB913;color:#1a1a1a;font:600 13px/1.2 system-ui,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.35)';\ndocument.body.appendChild(tip);\nfunction done() { tip.remove(); document.removeEventListener('click', onClick, true); document.removeEventListener('keydown', onKey, true); }\nfunction onKey(e) { if (e.key === 'Escape') done(); }\nfunction txt(el, sel) { var x = el && el.querySelector(sel); return x ? x.textContent.replace(/\\s+/g, ' ').trim() : ''; }\nfunction onClick(e) {\nvar card = e.target.closest('[aria-roledescription=draggable]') || e.target.closest('tr');\nif (!card) return;\ndone();\nvar title = txt(card, 'p.font-medium') || txt(card, 'td');\nvar sub = txt(card, 'p.truncate');\nvar parts = sub.split(' \u2022 ');\nvar negocio = (parts[0] || '').trim(), cliente = (parts[1] || parts[0] || '').trim();\nvar w = window.open('', 'dede');\nsetTimeout(function () {\nvar data = '', hora = '';\nvar dlg = Array.prototype.find.call(document.querySelectorAll('[role=dialog]'), function (d) { return d.innerText.indexOf(title) > -1; });\nvar m = (dlg ? dlg.innerText : '').match(/(\\d{1,2}) de ([a-z\u00e7]+)(?: de (\\d{4}))? \u00e0s (\\d{1,2}:\\d{2})/i);\nif (m) { data = (m[3] || new Date().getFullYear()) + '-' + String(M.indexOf(m[2].toLowerCase()) + 1).padStart(2, '0') + '-' + m[1].padStart(2, '0'); hora = m[4].padStart(5, '0'); }\nvar q = new URLSearchParams({ cliente: cliente, card: title, negocio: negocio, data: data, hora: hora, link: location.href });\nvar url = DEDE + '#registrar?' + q.toString();\nif (w) { w.location.href = url; w.focus(); } else location.href = url;\n}, 700);\n}\ndocument.addEventListener('click', onClick, true);\ndocument.addEventListener('keydown', onKey, true);\n})();";
+const LULU_BM = "(function () {\nvar DEDE = '__DEDE__';\nvar M = ['janeiro','fevereiro','mar\u00e7o','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];\nvar tip = document.createElement('div');\ntip.textContent = 'Ded\u00e9: clique no card que voc\u00ea quer registrar (Esc cancela)';\ntip.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483647;background:#FDB913;color:#1a1a1a;font:600 13px/1.2 system-ui,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.35)';\ndocument.body.appendChild(tip);\nfunction done() { tip.remove(); document.removeEventListener('click', onClick, true); document.removeEventListener('keydown', onKey, true); }\nfunction onKey(e) { if (e.key === 'Escape') done(); }\nfunction txt(el, sel) { var x = el && el.querySelector(sel); return x ? x.textContent.replace(/\\s+/g, ' ').trim() : ''; }\nfunction onClick(e) {\nvar card = e.target.closest('[aria-roledescription=draggable]') || e.target.closest('tr');\nif (!card) return;\ndone();\nvar title = txt(card, 'p.font-medium') || txt(card, 'td');\nvar sub = txt(card, 'p.truncate');\nvar nome = (sub.split(' \u2022 ')[0] || title).trim();\nvar w = window.open('', 'dede');\nsetTimeout(function () {\nvar data = '', hora = '';\nvar dlg = Array.prototype.find.call(document.querySelectorAll('[role=dialog]'), function (d) { return d.innerText.indexOf(title) > -1; });\nvar m = (dlg ? dlg.innerText : '').match(/(\\d{1,2}) de ([a-z\u00e7]+)(?: de (\\d{4}))? \u00e0s (\\d{1,2}:\\d{2})/i);\nif (m) { data = (m[3] || new Date().getFullYear()) + '-' + String(M.indexOf(m[2].toLowerCase()) + 1).padStart(2, '0') + '-' + m[1].padStart(2, '0'); hora = m[4].padStart(5, '0'); }\nvar v = (dlg ? dlg.innerText : '').match(/Criado por ([^\\n\u2022]+)/i);\nvar q = new URLSearchParams({ card: nome, vendedor: v ? v[1].trim() : '', pedido: title, data: data, hora: hora, link: location.href });\nvar url = DEDE + '#registrar?' + q.toString();\nif (w) { w.location.href = url; w.focus(); } else location.href = url;\n}, 700);\n}\ndocument.addEventListener('click', onClick, true);\ndocument.addEventListener('keydown', onKey, true);\n})();";
 const luluBmHref = () => 'javascript:' + encodeURIComponent(LULU_BM.replace('__DEDE__', location.origin + location.pathname));
 let luluSeq = 0;
 async function onLuluLink(input) {
@@ -349,10 +349,9 @@ function openFromHash() {
   openNew();
   const form = $('#actForm'), link = q.get('link') || '';
   if (link) { form.elements.luluLink.value = link; }
-  const d = luluFromParams(q), deal = q.get('negocio') || '';
-  if (!d.client && deal) d.client = deal;
+  const d = luluFromParams(q), deal = q.get('pedido') || q.get('negocio') || '';
   if (deal) form.elements.deal.value = deal;
-  if (d.client || d.name || d.date) { fillFromLulu(form, d, true); const st = form.querySelector('.lulu-st'); st.className = 'lulu-st ok'; st.textContent = deal ? `Puxado do Lulu · ${deal}` : 'Puxado do Lulu'; }
+  if (d.seller || d.name || d.date) { fillFromLulu(form, d, true); const st = form.querySelector('.lulu-st'); st.className = 'lulu-st ok'; st.textContent = deal ? `Puxado do Lulu · ${deal}` : 'Puxado do Lulu'; }
   else if (link) onLuluLink(form.elements.luluLink);
 }
 function newDesigner() {
@@ -376,7 +375,7 @@ function openNew(fromFab) {
     <footer><span class="k-hint"><i class="hint-dot">i</i>Pontuação estimada, sujeita à validação da gestão.</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button></footer>`;
   const dl = $('#actDlg'); if (!dl.open) { dl.classList.toggle('from-fab', !!fromFab); dl.showModal(); }
   $('#actForm').scrollTop = 0;
-  $('#actForm').elements.client.focus();
+  $('#actForm').elements.name.focus();
 }
 function readCard(form) {
   const F = form.elements, adds = {};
@@ -384,7 +383,7 @@ function readCard(form) {
   const c = {
     designerId: F.designerId ? F.designerId.value : me().id,
     date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()),
-    client: F.client.value.trim(), name: F.name.value.trim(), luluLink: (F.luluLink ? F.luluLink.value.trim() : ''), deal: (F.deal ? F.deal.value.trim() : ''),
+    client: '', seller: F.seller.value.trim(), name: F.name.value.trim(), luluLink: (F.luluLink ? F.luluLink.value.trim() : ''), deal: (F.deal ? F.deal.value.trim() : ''),
     kind: (F.kind && F.kind.value) || 'logo', logoQ: (F.logoQ && F.logoQ.value) || 'alta', adds,
     diff: (F.diff && F.diff.value) || 'moderado', mins: parseHM(F.mins.value), details: F.details.value.trim(),
   };
@@ -410,7 +409,7 @@ function block(p, from, to, idx) {
   const rate = p.payByPoints ? S.settings.pointValue : null;
   let rows = s.acts.slice();
   if (ui.status !== 'todas') rows = rows.filter(a => a.status === ui.status);
-  if (ui.q) { const q = ui.q.toLowerCase(); rows = rows.filter(a => `${a.client} ${a.name} ${a.deal || ''} ${a.luluId} ${a.luluLink || ''} ${kindOf(a.kind).label} ${a.details}`.toLowerCase().includes(q)); }
+  if (ui.q) { const q = ui.q.toLowerCase(); rows = rows.filter(a => `${a.seller || ''} ${a.client} ${a.name} ${a.deal || ''} ${a.luluId} ${a.luluLink || ''} ${kindOf(a.kind).label} ${a.details}`.toLowerCase().includes(q)); }
   rows.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const pendN = s.acts.filter(a => a.status === 'pendente').length;
   const lim = ui.limit[p.id] || 25, rest = rows.length - lim;
@@ -434,7 +433,7 @@ function block(p, from, to, idx) {
     </header>
     <div class="b-body"><div class="b-inner">
       <div class="cards">
-        <div class="ch"><span>Data</span><span>Hora</span><span>Cliente</span><span>Card</span><span>Tipo</span><span>Complexidade</span><span class="num">Tempo</span><span class="num">Pts</span><span class="num">A receber</span><span>Status</span><span></span></div>
+        <div class="ch"><span>Data</span><span>Hora</span><span>Card</span><span>Vendedor</span><span>Tipo</span><span>Complexidade</span><span class="num">Tempo</span><span class="num">Pts</span><span class="num">A receber</span><span>Status</span><span></span></div>
         ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nenhum resultado para este filtro.' : p.id === m.id ? 'Nenhum registro ainda. Use o botão <b>+</b> no canto da tela para começar.' : 'Sem registros no período.'}</span></div>`}
         ${rows.length ? `<div class="cards-foot"><span class="cf-l">${plural(rows.length, 'registro', 'registros')}${rate != null ? ` · ${fmtBRL(rate)}/pt` : ''}</span><span class="num cf-pts"><b>${fmtPts(okPts)}</b></span><span class="num cf-pay">${!one && rate != null ? `<b>${fmtBRL(okPts * rate)}</b>` : ''}</span><span class="cf-r">validados</span></div>` : ''}
       </div>
@@ -466,8 +465,8 @@ function cardRow(a, i, rate, admin, m) {
   return `<div class="crow r-${a.status} ${flash}" style="--dc:${d.color};--i:${Math.min(i, 14)}">
     <div class="c-date">${fmtDay(a.date)}</div>
     <div class="c-time">${esc(a.time || '—')}</div>
-    <div class="c-client" title="${esc(a.client || '')}">${esc(a.client || '—')}</div>
-    <div class="c-card"><span title="${esc(a.name || '')}${a.deal ? ' · ' + esc(a.deal) : ''}">${a.name ? esc(a.name) : '<i>sem nome</i>'}${!a.luluLink && a.luluId ? `<small>#${esc(a.luluId)}</small>` : ''}</span>${a.luluLink ? `<a class="c-link" href="${esc(a.luluLink)}" target="_blank" rel="noopener" data-tip="Abrir no Lulu">${ico('link')}</a>` : ''}${a.details ? `<i class="c-note" tabindex="0" data-tip="${esc(a.details)}">${ico('note')}</i>` : ''}</div>
+    <div class="c-card"><span title="${esc(a.name || a.client || '')}${a.deal ? ' · ' + esc(a.deal) : ''}">${a.name ? esc(a.name) : a.client ? esc(a.client) : '<i>sem nome</i>'}${!a.luluLink && a.luluId ? `<small>#${esc(a.luluId)}</small>` : ''}</span>${a.luluLink ? `<a class="c-link" href="${esc(a.luluLink)}" target="_blank" rel="noopener" data-tip="Abrir no Lulu">${ico('link')}</a>` : ''}${a.details ? `<i class="c-note" tabindex="0" data-tip="${esc(a.details)}">${ico('note')}</i>` : ''}</div>
+    <div class="c-client" title="${esc(a.seller || '')}">${esc(a.seller || '—')}</div>
     <div class="c-kind"><span class="tag" style="--tc:${k.color}"><i></i>${esc(k.label)}</span>${mods.length ? `<span class="mods-n" tabindex="0" data-tip="${esc(modTip)}">+${mods.length}</span>` : ''}</div>
     <div class="c-diff"><span class="dff" style="--dc:${d.color}"><i></i>${esc(d.label)}</span></div>
     <div class="num c-mins">${a.mins ? fmtDur(a.mins) : '—'}</div>
@@ -759,10 +758,10 @@ function ripple(e) {
 function saveCardFromForm(form, existing) {
   const admin = isAdmin(), c = readCard(form);
   const err = msg => { const el = form.querySelector('#actErr') || form.querySelector('.rc-err'); if (el) { el.textContent = msg; } toast(msg, 'warn'); };
-  if (!c.client) { err('Qual o cliente?'); const f = form.elements.client; f.focus(); f.closest('.f').classList.add('shake'); setTimeout(() => f.closest('.f').classList.remove('shake'), 500); return null; }
+  if (!c.name) { err('Qual o nome do card?'); const f = form.elements.name; f.focus(); f.closest('.f').classList.add('shake'); setTimeout(() => f.closest('.f').classList.remove('shake'), 500); return null; }
   const sc = scoreOf(c);
   const pts = admin && c.ptsOverride != null ? c.ptsOverride : sc.total;
-  const data = { designerId: c.designerId, date: c.date, time: c.time, client: c.client, name: c.name, luluLink: c.luluLink, deal: c.deal || (existing && existing.deal) || '', luluId: luluIdOf(c.luluLink) || (existing && existing.luluId) || '', kind: c.kind, logoQ: c.logoQ, adds: c.adds, diff: c.diff, mins: c.mins, details: c.details, pts };
+  const data = { designerId: c.designerId, date: c.date, time: c.time, client: (existing && existing.client) || '', seller: c.seller, name: c.name, luluLink: c.luluLink, deal: c.deal || (existing && existing.deal) || '', luluId: luluIdOf(c.luluLink) || (existing && existing.luluId) || '', kind: c.kind, logoQ: c.logoQ, adds: c.adds, diff: c.diff, mins: c.mins, details: c.details, pts };
   if (existing) {
     Object.assign(existing, data);
     if (admin) { existing.status = form.elements.status.value; existing.note = form.elements.note.value.trim(); }
@@ -805,7 +804,7 @@ function bind() {
       save(); render(); toast(plural(list.length, 'card validado', 'cards validados')); return;
     }
     if ((el = t.closest('[data-toggle]'))) { if (t.closest('button, select, input')) return; if (visiblePeople().length === 1) return; ui.closed[el.dataset.toggle] = !ui.closed[el.dataset.toggle]; el.closest('.block').classList.toggle('closed'); return; }
-    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { a.status = 'aprovada'; a.note = ''; ui.flash[a.id] = 'ok'; addLog(`aprovou: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)`); save(); render(); toast('Card validado'); } return; }
+    if ((el = t.closest('[data-approve]'))) { const a = act(el.dataset.approve); if (a) { a.status = 'aprovada'; a.note = ''; ui.flash[a.id] = 'ok'; addLog(`aprovou: ${who(a)} · ${a.name || a.client} (${fmtPts(a.pts)} pts)`); save(); render(); toast('Card validado'); } return; }
     if ((el = t.closest('[data-mark]'))) { const [id, st] = el.dataset.mark.split('|'); const a = act(id); if (a) openAct(st, a); return; }
     if ((el = t.closest('[data-edit-act]'))) { const a = act(el.dataset.editAct); if (a) openAct('edit', a); return; }
     if ((el = t.closest('[data-view-act]'))) { const a = act(el.dataset.viewAct); if (a) openAct('view', a); return; }
@@ -846,7 +845,7 @@ function bind() {
     }
     if (t.matches('[data-pts]')) {
       const a = act(t.dataset.pts), v = parseFloat(String(t.value).replace(',', '.'));
-      if (a && !isNaN(v) && v >= 0) { const old = a.pts; a.pts = v; ui.flash[a.id] = 'edit'; addLog(`ajustou pontos de ${who(a)} · ${a.client}: ${fmtPts(old)} → ${fmtPts(v)}`); save(); render(); toast('Pontuação ajustada'); }
+      if (a && !isNaN(v) && v >= 0) { const old = a.pts; a.pts = v; ui.flash[a.id] = 'edit'; addLog(`ajustou pontos de ${who(a)} · ${a.name || a.client}: ${fmtPts(old)} → ${fmtPts(v)}`); save(); render(); toast('Pontuação ajustada'); }
       return;
     }
     if (t.matches('[data-pay]')) { const p = person(t.dataset.pay); if (p) { p.payByPoints = t.checked; save(); toast(t.checked ? 'Recebe por pontos' : 'Valor fixo', 'info'); } return; }
@@ -884,7 +883,7 @@ function bind() {
     if (actCtx.mode === 'new') {
       const n = saveCardFromForm(e.target, null); if (!n) return;
       ui.flash[n.id] = 'new';
-      if (isAdmin()) addLog(`lançou para ${who(n)}: ${n.client} (${fmtPts(n.pts)} pts)`);
+      if (isAdmin()) addLog(`lançou para ${who(n)}: ${n.name} (${fmtPts(n.pts)} pts)`);
       save();
       ui.draft = { ...emptyCard(n.designerId), date: n.date };
       const again = e.submitter && e.submitter.name === 'again';
@@ -895,7 +894,7 @@ function bind() {
     const a = act(actCtx.id), admin = isAdmin();
     if (admin && (e.target.elements.status.value === 'erro' || e.target.elements.status.value === 'recusada') && !e.target.elements.note.value.trim()) { $('#actErr').textContent = 'Escreva um comentário para o designer.'; return; }
     if (!saveCardFromForm(e.target, a)) return;
-    if (admin) addLog(`${STATUS[a.status].label.toLowerCase()}: ${who(a)} · ${a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`);
+    if (admin) addLog(`${STATUS[a.status].label.toLowerCase()}: ${who(a)} · ${a.name || a.client} (${fmtPts(a.pts)} pts)${a.note ? ' — ' + a.note : ''}`);
     ui.flash[a.id] = a.status === 'aprovada' ? 'ok' : a.status === 'recusada' || a.status === 'erro' ? 'warn' : 'edit';
     save(); closeDlg($('#actDlg')); render();
     toast(actCtx.mode === 'erro' ? 'Ajuste solicitado' : actCtx.mode === 'recusada' ? 'Card reprovado' : (!admin ? 'Reenviado para validação' : 'Alterações salvas'), actCtx.mode === 'edit' ? 'ok' : 'warn');
@@ -934,12 +933,12 @@ function closeDlg(dl) { if (!dl.open) return; dl.classList.add('closing'); setTi
 function exportCSV() {
   const { from, to, label } = period();
   const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Link do Lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Justificativa', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$)'].join(';')];
+  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Nome do card', 'Vendedor', 'Link do Lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Observações', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$)'].join(';')];
   for (const p of isAdmin() ? designers() : [me()]) {
     const s = stats(p.id, from, to);
     for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
       const d = parseKey(a.date);
-      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), q(a.name), q(a.luluLink || a.luluId || ''), q(kindOf(a.kind).label), q(logoOf(a.logoQ).label), ...S.settings.adds.map(ad => (a.adds || {})[ad.id] || 0), diffOf(a.diff).label, a.mins || 0, q(a.details), n(a.pts), STATUS[a.status].label, q(a.note), p.payByPoints && a.status === 'aprovada' ? n((a.pts * S.settings.pointValue).toFixed(2)) : ''].join(';'));
+      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.name || a.client), q(a.seller || ''), q(a.luluLink || a.luluId || ''), q(kindOf(a.kind).label), q(logoOf(a.logoQ).label), ...S.settings.adds.map(ad => (a.adds || {})[ad.id] || 0), diffOf(a.diff).label, a.mins || 0, q(a.details), n(a.pts), STATUS[a.status].label, q(a.note), p.payByPoints && a.status === 'aprovada' ? n((a.pts * S.settings.pointValue).toFixed(2)) : ''].join(';'));
     }
   }
   const el = document.createElement('a');
