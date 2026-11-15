@@ -1554,3 +1554,74 @@ main{view-transition-name:main}
 @keyframes vtIn{from{opacity:0;transform:translateY(6px)}}
 html{scroll-behavior:smooth}
 .pay-bar.empty{background:#ECECF0}
+
+/* =====================================================================
+   v7 · fluidez (sem desfoque pesado) + janela com uma rolagem só + Lulu
+   ===================================================================== */
+html{scroll-behavior:auto}
+main{view-transition-name:none}
+.shell{background-attachment:scroll}
+.top{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(248,248,250,.97)}
+@media (min-width:861px){ .rail{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(255,255,255,.82)} }
+@media (max-width:860px){ .rail{backdrop-filter:none;-webkit-backdrop-filter:none;background:#fff} }
+[data-tip]:hover::after,[data-tip]:focus-visible::after{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(22,22,26,.95);animation:tip3 .14s ease-out .08s both}
+@keyframes tip3{from{opacity:0}}
+.hint[data-tip]:hover::after,.hint[data-tip]:focus-visible::after{animation:tip3 .14s ease-out .05s both}
+#toast{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(22,22,26,.95)}
+.block{content-visibility:auto;contain-intrinsic-size:auto 640px}
+
+/* entrada de tela: um fade curto e só */
+main.enter .page>*,main.enter .summary>div,main.enter .cards .crow,main.enter .kpi,main.enter .lb-grid>*{animation:none!important}
+main.enter>.page{animation:pgIn .2s var(--ease) both}
+@keyframes pgIn{from{opacity:0;transform:translateY(3px)}}
+
+/* janelas: abrem rápido, sem desfoque */
+dialog{backdrop-filter:none;-webkit-backdrop-filter:none;background:#fff}
+dialog::backdrop{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(18,18,24,.4)}
+dialog[open]{animation:dlgIn2 .2s var(--ease)}
+#actDlg.from-fab[open]{animation:dlgIn2 .2s var(--ease)}
+dialog[open]::backdrop{animation:fade .18s ease}
+@keyframes dlgIn2{from{opacity:0;transform:translateY(10px) scale(.985)}}
+
+/* registrar/editar card: cabeçalho e rodapé fixos, uma rolagem no meio */
+#actDlg{max-height:min(900px,calc(100vh - 32px));overflow:hidden}
+#actDlg[open]{display:flex;flex-direction:column}
+#actForm{flex:1;min-height:0;max-height:none;overflow:hidden;display:flex;flex-direction:column;padding:0;gap:0}
+#actForm>header,#actForm>footer{position:static;flex:none;backdrop-filter:none;-webkit-backdrop-filter:none;background:#fff;margin:0}
+#actForm>header{border-bottom:1px solid var(--line)}
+#actForm>footer{border-top:1px solid var(--line)}
+#actForm>.dlg-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:10px;padding:16px 20px 12px;scrollbar-width:thin;scrollbar-color:#D4D4D8 transparent;-webkit-overflow-scrolling:touch}
+#actForm>.dlg-body::-webkit-scrollbar{width:8px}
+#actForm>.dlg-body::-webkit-scrollbar-thumb{background:#D4D4D8;border-radius:8px;border:2px solid #fff}
+.dlg-body>fieldset.cp-grid.dlg,.dlg-body>.dlg-hint,.dlg-body>.adm-box,.dlg-body>.err{margin:0!important}
+.dlg-body>.err:empty{display:none}
+fieldset.cp-grid.dlg{overflow:visible}
+fieldset.cp-grid.dlg .receipt{position:sticky;top:0}
+@media (max-width:860px){
+  #actDlg{max-height:calc(100vh - 16px)}
+  #actForm>.dlg-body{padding:12px}
+}
+
+/* link do Lulu */
+.lulu-f{margin-bottom:2px}
+.lulu-in{position:relative;display:flex;flex-direction:column}
+.lulu-in>.ico{position:absolute;left:11px;top:11px;width:15px;height:15px;color:var(--muted);pointer-events:none}
+.lulu-in input{padding-left:34px!important;height:38px!important}
+.lulu-st{display:none;align-items:center;gap:6px;margin-top:5px;font-style:normal;font-size:11.5px;font-weight:500}
+.lulu-st.load,.lulu-st.ok,.lulu-st.warn{display:flex}
+.lulu-st::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.lulu-st.load{color:var(--muted)}
+.lulu-st.load::before{animation:blink .8s ease-in-out infinite alternate}
+.lulu-st.ok{color:#15803D}
+.lulu-st.warn{color:#B45309}
+@keyframes blink{to{opacity:.25}}
+.f.filled input{animation:filled .9s var(--ease)}
+@keyframes filled{0%{background:#FFF3C4;border-color:#F5C542}100%{background:#fff}}
+.c-link{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:6px;color:var(--ink-3);background:#F1F1F4;position:relative;transition:background-color .15s,color .15s}
+.c-link:hover{background:var(--ink);color:#fff}
+.c-link .ico{width:12px;height:12px}
+.time-row{flex-wrap:wrap}
+.lulu-help{margin:-2px 0 4px;font-size:11.5px;line-height:1.5;color:var(--muted)}
+.lulu-bm{display:inline-flex;align-items:center;gap:5px;margin:0 2px;padding:2px 9px 2px 7px;border-radius:7px;font-weight:600;color:#1a1a1a;background:var(--brand);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 0 0 .5px rgba(150,90,0,.4);cursor:grab;text-decoration:none;white-space:nowrap}
+.lulu-bm .ico{width:12px;height:12px}
+.lulu-bm:active{cursor:grabbing}
