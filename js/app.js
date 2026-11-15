@@ -147,7 +147,12 @@ function countUp() {
     requestAnimationFrame(step);
   });
 }
-function go(view) { ui.view = view; ui.enter = true; render(); scrollTo({ top: 0, behavior: 'smooth' }); }
+const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function smooth(fn) {
+  const run = () => { fn(); render(); };
+  if (document.startViewTransition && !calm()) document.startViewTransition(run); else run();
+}
+function go(view) { if (view === ui.view) { render(); return; } scrollTo({ top: 0 }); smooth(() => { ui.view = view; ui.enter = true; }); }
 
 /* ============================================================
    ATIVIDADES (igual para todos)
@@ -164,8 +169,6 @@ function viewAtividades() {
   return `<section class="page">
     ${summary(ppl, from, to)}
     <div class="filters">
-      ${seg('status', [['todas', 'Todos', cnt('todas')], ['pendente', 'Em revisão', cnt('pendente')], ['aprovada', 'Validados', cnt('aprovada')], ['erro', 'Ajustes', cnt('erro')], ['recusada', 'Reprovados', cnt('recusada')]], ui.status)}
-      <span class="sp"></span>
       ${isAdmin() ? `<label class="select-pill">${ico('users')}<select data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${ico('chev')}</label>` : ''}
       <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, nº lulu…" value="${esc(ui.q)}" data-q></label>
     </div>
@@ -177,7 +180,7 @@ function welcome() {
   return `<section class="page"><div class="welcome">
     <img src="img/seubone-logo-branco.png" alt="SeuBoné" class="w-logo">
     <h2>Bem-vindo ao <b>Dedé</b></h2>
-    <p>Os designers lançam cada card que fizeram, a gestão confere e todo mundo acompanha pontos, buff, ranking e quanto vai receber.</p>
+    <p>Os designers lançam cada card que fizeram, a gestão confere e todo mundo acompanha pontos, ranking e quanto vai receber.</p>
     <div class="w-steps"><div><b>1</b>Cadastre os designers</div><div><b>2</b>Confira a tabela de pontos</div><div><b>3</b>O time começa a lançar</div></div>
     ${isAdmin() ? `<div class="btns"><button class="btn brand big" data-add-person>${ico('plus')}Cadastrar primeiro designer</button><button class="btn glass" data-io="demo">Ver com dados de exemplo</button></div>` : ''}
   </div></section>`;
@@ -189,22 +192,30 @@ function summary(ppl, from, to) {
   const t = st.reduce((a, { s }) => ({ pts: a.pts + s.points, pend: a.pend + s.pending, pendPts: a.pendPts + s.pendingPts, min: a.min + s.minutes, pay: a.pay + (s.pay || 0), cards: a.cards + s.cards }), { pts: 0, pend: 0, pendPts: 0, min: 0, pay: 0, cards: 0 });
   const one = ppl.length === 1 ? st[0] : null;
   const who = admin ? (one ? firstName(one.p.name) : 'Time') : 'Você';
-  let buffCell;
-  if (one) {
+  let buffCell = '';
+  if (BUFF_ON && one) {
     const b = one.s.buff;
     buffCell = b.eligible
-      ? `<div class="sm-buff ${multCls(b.mult)}"><span>Buff · ${MONTHL(parseKey(to))}${hint(buffTip())}</span><b>${fmtMult(b.mult)}</b><small>média ${fmtNum(b.avgH)}h/dia${b.next ? ` · +${fmtNum(b.next.h - b.avgH)}h p/ ${fmtMult(b.next.mult)}` : ' · faixa máxima'}</small></div>`
+      ? `<div class="sm-buff ${multCls(b.mult)}"><span>Buff · ${MONTHL(parseKey(to))}${hint(buffTip())}</span><b>${fmtMult(b.mult)}</b><small>média ${fmtNum(b.avgH)}h/dia</small></div>`
       : `<div class="sm-buff"><span>Buff${hint(buffTip())}</span><b>—</b><small>aplicável apenas a PJ</small></div>`;
-  } else {
+  } else if (BUFF_ON) {
     const pj = st.filter(x => x.s.buff.eligible), on = pj.filter(x => x.s.buff.mult > 1).length;
     buffCell = `<div class="sm-buff"><span>Buff ativo${hint(buffTip())}</span><b>${on}<i>/ ${pj.length}</i></b><small>PJs com multiplicador no mês</small></div>`;
   }
-  return `<div class="summary">
+  const rateOf = p => p.payByPoints ? S.settings.pointValue : 0;
+  const pendPay = st.reduce((x, { p, s }) => x + s.pendingPts * rateOf(p), 0);
+  const full = t.pay + pendPay, okPct = full ? Math.round(t.pay / full * 100) : 0;
+  return `<div class="summary ${BUFF_ON ? '' : 'four'}">
     <div class="sm-main"><span>Pontuação validada${admin ? ` · ${esc(who)}` : ''}</span><b>${num(t.pts)}<i>pts</i></b><small>${plural(t.cards, 'card validado', 'cards validados')}</small></div>
     <div><span>Em revisão${hint('Pontos ainda não validados pela gestão. Não entram no cálculo da remuneração até a validação.')}</span><b>${num(t.pendPts)}<i>pts</i></b><small>${plural(t.pend, 'card pendente', 'cards pendentes')}</small></div>
-    <div><span>Horas registradas${hint('Horas online registradas pela gestão. São a base de cálculo do Buff mensal.')}</span><b>${num(t.min, 'dur')}</b><small>${one ? 'no período' : 'total da equipe'}</small></div>
+    <div><span>Horas registradas${hint('Horas online registradas pela gestão no período.')}</span><b>${num(t.min, 'dur')}</b><small>${one ? 'no período' : 'total da equipe'}</small></div>
     ${buffCell}
-    <div class="sm-pay"><span>${admin && !one ? 'Custo previsto' : 'Remuneração prevista'}${hint('Valor estimado, calculado só com cards validados. O Buff é aplicado no fechamento do mês e o valor final pode mudar até lá.')}</span><b>${num(t.pay, 'brl')}</b><small>pts validados × ${fmtBRL(S.settings.pointValue)}${one && one.s.buff.mult > 1 ? ' × buff' : ''}</small></div>
+    <div class="sm-pay">
+      <span>${admin && !one ? 'A pagar' : 'A receber'}${hint('Valor estimado: pontos validados × valor do ponto. Cards em revisão entram quando forem validados.')}</span>
+      <b>${num(t.pay, 'brl')}</b>
+      <div class="pay-bar ${full ? '' : 'empty'}" title="${okPct}% já validado"><i style="--w:${okPct}%"></i></div>
+      <small>${pendPay ? `<em>+ ${fmtBRL(pendPay)}</em> em revisão` : `${fmtBRL(S.settings.pointValue)} por ponto validado`}</small>
+    </div>
   </div>`;
 }
 
@@ -271,7 +282,7 @@ function receipt(c, opts = {}) {
     <ul class="rc-lines">${sc.lines.map(l => `<li><span>${esc(l.label)}</span><b>${l.pts > 0 && sc.lines[0] !== l ? '+' : ''}${fmtPts(l.pts)}</b></li>`).join('')}</ul>
     <div class="rc-total"><span>Total</span><b class="rc-pts">${fmtPts(pts)}</b><small>pts</small></div>
     ${admin ? `<label class="rc-ovr"><span>Ajuste manual</span><input name="ptsOverride" value="${opts.override != null ? opts.override : ''}" placeholder="${fmtPts(sc.total)}" inputmode="decimal"></label>` : ''}
-    <div class="rc-val">≈ ${fmtBRL(pts * S.settings.pointValue)}<small>valor bruto, sem buff</small></div>
+    <div class="rc-val">≈ ${fmtBRL(pts * S.settings.pointValue)}<small>valor estimado do card</small></div>
     ${opts.submit || ''}
   </aside>`;
 }
@@ -321,7 +332,7 @@ function refreshReceipt(form) {
   rc.querySelector('.rc-lines').innerHTML = sc.lines.map((l, i) => `<li><span>${esc(l.label)}</span><b>${i ? '+' : ''}${fmtPts(l.pts)}</b></li>`).join('');
   const el = rc.querySelector('.rc-pts');
   if (el.textContent !== fmtPts(pts)) { el.textContent = fmtPts(pts); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
-  rc.querySelector('.rc-val').innerHTML = `≈ ${fmtBRL(pts * S.settings.pointValue)}<small>valor bruto, sem buff</small>`;
+  rc.querySelector('.rc-val').innerHTML = `≈ ${fmtBRL(pts * S.settings.pointValue)}<small>valor estimado do card</small>`;
   const ov = form.elements.ptsOverride; if (ov) ov.placeholder = fmtPts(sc.total);
   if (actCtx && actCtx.mode === 'new') ui.draft = c;
 }
@@ -350,16 +361,16 @@ function block(p, from, to, idx) {
         <span class="chip"><small>Validados</small><b>${fmtPts(s.points)}</b></span>
         ${pendN ? `<span class="chip warn"><small>Em revisão</small><b>${pendN}</b></span>` : ''}
         <${admin ? 'button' : 'span'} class="chip ${admin ? 'edit' : ''}" ${admin ? `data-hours="${p.id}" data-tip="Registrar horas"` : ''}><small>Horas</small><b>${fmtDur(s.minutes)}</b>${admin ? ico('clock', 'mini') : ''}</${admin ? 'button' : 'span'}>
-        <span class="chip buff ${multCls(b.mult)}" ${b.eligible ? `data-tip="${fmtNum(b.avgH)}h/dia em ${MONTHL(parseKey(to))}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>
+        ${BUFF_ON ? `<span class="chip buff ${multCls(b.mult)}" ${b.eligible ? `data-tip="${fmtNum(b.avgH)}h/dia em ${MONTHL(parseKey(to))}"` : 'data-tip="Buff só para PJ"'}><small>Buff</small><b>${b.eligible ? fmtMult(b.mult) : '—'}</b></span>` : ''}
       </div>
       ${admin && pendN ? `<button class="btn ok sm" data-approve-all="${p.id}">${ico('check')}Validar ${pendN}</button>` : ''}
       ${one ? '' : `<span class="b-chev">${ico('chev')}</span>`}
     </header>
     <div class="b-body"><div class="b-inner">
       <div class="cards">
-        <div class="ch"><span>Data</span><span>Cliente · card</span><span>Tipo</span><span>Complexidade</span><span class="num">Pts</span><span class="num">Valor</span><span>Status</span><span></span></div>
-        ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nenhum resultado para este filtro.' : p.id === m.id ? 'Nenhum registro ainda. Use <b>Registrar card</b> para começar.' : 'Sem registros no período.'}</span></div>`}
-        ${rows.length ? `<div class="cards-foot"><span>${plural(rows.length, 'registro', 'registros')}${rate != null ? ` · ${fmtBRL(rate)}/pt${b.mult > 1 ? ` · buff ${fmtMult(b.mult)} aplicado no fechamento` : ''}` : ''}</span><b>${fmtPts(okPts)} pts validados</b></div>` : ''}
+        <div class="ch"><span>Data</span><span>Hora</span><span>Cliente</span><span>Card</span><span>Tipo</span><span>Complexidade</span><span class="num">Tempo</span><span class="num">Pts</span><span class="num">A receber</span><span>Status</span><span></span></div>
+        ${body || `<div class="cards-empty">${ico('spark')}<span>${ui.q || ui.status !== 'todas' ? 'Nenhum resultado para este filtro.' : p.id === m.id ? 'Nenhum registro ainda. Use o botão <b>+</b> no canto da tela para começar.' : 'Sem registros no período.'}</span></div>`}
+        ${rows.length ? `<div class="cards-foot"><span class="cf-l">${plural(rows.length, 'registro', 'registros')}${rate != null ? ` · ${fmtBRL(rate)}/pt` : ''}</span><span class="num cf-pts"><b>${fmtPts(okPts)}</b></span><span class="num cf-pay">${!one && rate != null ? `<b>${fmtBRL(okPts * rate)}</b>` : ''}</span><span class="cf-r">validados</span></div>` : ''}
       </div>
       ${rest > 0 ? `<div class="more"><button class="btn line sm" data-more="${p.id}">Mostrar mais ${Math.min(50, rest)} <span class="muted">de ${rest}</span></button></div>` : ''}
     </div></div>
@@ -382,14 +393,21 @@ function cardRow(a, i, rate, admin, m) {
     actions = `<span class="ab-more show"><button class="ab" data-edit-act="${a.id}" data-tip="${a.status === 'erro' ? 'Ajustar' : 'Editar'}">${ico('edit')}</button><button class="ab no" data-del-act="${a.id}" data-tip="Excluir">${ico('trash')}</button></span>`;
   } else actions = `<span class="ab-more show"><button class="ab" data-view-act="${a.id}" data-tip="Ver detalhes">${ico('note')}</button></span>`;
   const flash = ui.flash[a.id] ? `flash-${ui.flash[a.id]}` : '';
+  const val = rate == null ? null : a.pts * rate;
+  const payCell = val == null ? '<span class="pay-none">fixo</span>'
+    : `<span class="pay pay-${a.status}" ${a.status === 'pendente' ? 'data-tip="Entra quando for validado"' : a.status === 'recusada' ? 'data-tip="Reprovado: não entra no valor"' : a.status === 'erro' ? 'data-tip="Aguardando ajuste"' : ''}>${fmtBRL(val)}</span>`;
+  const modTip = mods.length ? mods.map(x => x.replace(/<[^>]+>/g, '')).join(' · ') : '';
   return `<div class="crow r-${a.status} ${flash}" style="--dc:${d.color};--i:${Math.min(i, 14)}">
-    <div class="c-when"><b>${fmtDay(a.date)}</b><small>${esc(a.time || '')}</small></div>
-    <div class="c-main"><b>${esc(a.client || '—')}</b><span>${a.name ? esc(a.name) : '<i>sem nome</i>'}${a.luluId ? ` · lulu #${esc(a.luluId)}` : ''}</span>${a.details ? `<em title="${esc(a.details)}">“${esc(a.details)}”</em>` : ''}</div>
-    <div class="c-kind"><span class="tag" style="--tc:${k.color}"><i></i>${esc(k.label)}</span>${mods.length ? `<div class="mods">${mods.join('')}</div>` : ''}</div>
-    <div class="c-meta"><span class="dff" style="--dc:${d.color}"><i></i>${esc(d.label)}</span>${a.mins ? `<small>${ico('timer')}${fmtDur(a.mins)}</small>` : ''}</div>
-    <div class="num c-pts">${admin ? `<input class="pts-in ${adjusted ? 'adj' : ''}" type="number" step="0.25" min="0" value="${a.pts}" data-pts="${a.id}" title="${adjusted ? `pelas regras: ${fmtPts(sc.total)}` : 'clique para ajustar'}">` : `<b>${fmtPts(a.pts)}</b>${adjusted ? `<small class="adj-note">regras: ${fmtPts(sc.total)}</small>` : ''}`}</div>
-    <div class="num money ${a.status === 'aprovada' ? '' : 'faded'}">${rate == null ? '—' : fmtBRL(a.pts * rate)}</div>
-    <div class="c-status"><span class="st ${st.cls}">${st.label}</span>${a.note ? `<small class="st-note">${esc(a.note)}</small>` : ''}</div>
+    <div class="c-date">${fmtDay(a.date)}</div>
+    <div class="c-time">${esc(a.time || '—')}</div>
+    <div class="c-client" title="${esc(a.client || '')}">${esc(a.client || '—')}</div>
+    <div class="c-card"><span title="${esc(a.name || '')}${a.luluId ? ` · lulu #${esc(a.luluId)}` : ''}">${a.name ? esc(a.name) : '<i>sem nome</i>'}${a.luluId ? `<small>#${esc(a.luluId)}</small>` : ''}</span>${a.details ? `<i class="c-note" tabindex="0" data-tip="${esc(a.details)}">${ico('note')}</i>` : ''}</div>
+    <div class="c-kind"><span class="tag" style="--tc:${k.color}"><i></i>${esc(k.label)}</span>${mods.length ? `<span class="mods-n" tabindex="0" data-tip="${esc(modTip)}">+${mods.length}</span>` : ''}</div>
+    <div class="c-diff"><span class="dff" style="--dc:${d.color}"><i></i>${esc(d.label)}</span></div>
+    <div class="num c-mins">${a.mins ? fmtDur(a.mins) : '—'}</div>
+    <div class="num c-pts">${admin ? `<input class="pts-in ${adjusted ? 'adj' : ''}" type="number" step="0.25" min="0" value="${a.pts}" data-pts="${a.id}" title="${adjusted ? `pelas regras: ${fmtPts(sc.total)}` : 'clique para ajustar'}">` : `<b>${fmtPts(a.pts)}</b>${adjusted ? `<small class="adj-note" title="pelas regras: ${fmtPts(sc.total)}">*</small>` : ''}`}</div>
+    <div class="num c-pay">${payCell}</div>
+    <div class="c-status"><span class="st ${st.cls}" ${a.note ? `data-tip="${esc(a.note)}"` : ''}>${st.label}${a.note ? ' ·' : ''}</span></div>
     <div class="c-actions">${actions}</div>
   </div>`;
 }
@@ -403,13 +421,13 @@ function viewRanking() {
   const w = startOfWeek(ui.day), wEnd = addDays(w, 6);
   const mFrom = new Date(ui.day.getFullYear(), ui.day.getMonth(), 1), mTo = new Date(ui.day.getFullYear(), ui.day.getMonth() + 1, 0);
   const week = designers().map(p => ({ p, s: stats(p.id, dkey(w), dkey(wEnd)) })).map(x => ({ ...x, score: x.s.points })).sort((a, b) => b.score - a.score);
-  const month = designers().map(p => ({ p, s: stats(p.id, dkey(mFrom), dkey(mTo)) })).map(x => ({ ...x, score: round2(x.s.points * x.s.buff.mult) })).sort((a, b) => b.score - a.score);
+  const month = designers().map(p => ({ p, s: stats(p.id, dkey(mFrom), dkey(mTo)) })).map(x => ({ ...x, score: round2(x.s.points * (BUFF_ON ? x.s.buff.mult : 1)) })).sort((a, b) => b.score - a.score);
   return `<section class="page">
     <div class="rank-grid">
       ${board('Ranking da semana', `${w.getDate()} a ${wEnd.getDate()} de ${MESL[wEnd.getMonth()]} · pontuação validada`, week, false)}
-      ${board('Ranking do mês', `${MESL[mFrom.getMonth()]} · pontuação validada × buff`, month, true)}
+      ${board('Ranking do mês', `${MESL[mFrom.getMonth()]} · pontuação validada${BUFF_ON ? ' × buff' : ''}`, month, true)}
     </div>
-    ${buffArea(mFrom)}
+    ${BUFF_ON ? buffArea(mFrom) : ''}
   </section>`;
 }
 function board(title, sub, list, monthly) {
@@ -475,7 +493,7 @@ function viewMetricas() {
   return `<section class="page">
     ${tot.pend ? `<button class="alert-bar" data-go-pending>${ico('alert')}<span><b>${plural(tot.pend, 'card em revisão', 'cards em revisão')}</b> · ${fmtPts(tot.pendPts)} pts fora do cálculo até a validação</span><em>${admin ? 'Revisar' : 'Ver'} ${ico('right')}</em></button>` : ''}
     <div class="kpis">
-      <div class="kpi dark"><span>${admin ? 'Custo do período' : 'Remuneração prevista'}</span><b>${num(admin ? tot.pay : (all.find(x => x.p.id === m.id)?.s.pay || 0), 'brl')}</b><small>${admin ? `custo médio ${fmtBRL(tot.cards ? tot.pay / tot.cards : 0)}/card` : 'cards validados × buff'}</small></div>
+      <div class="kpi dark"><span>${admin ? 'A pagar no período' : 'A receber'}</span><b>${num(admin ? tot.pay : (all.find(x => x.p.id === m.id)?.s.pay || 0), 'brl')}</b><small>${admin ? `custo médio ${fmtBRL(tot.cards ? tot.pay / tot.cards : 0)}/card` : 'cards validados'}</small></div>
       <div class="kpi"><span>Pontuação validada</span><b>${num(tot.pts)}</b><small>média ${fmtNum(tot.cards ? tot.pts / tot.cards : 0)} pts/card</small></div>
       <div class="kpi"><span>Cards validados</span><b>${num(tot.cards, 'int')}</b><small>tempo médio ${tot.cards ? fmtDur(tot.cmin / tot.cards) : '—'}/card</small></div>
       <div class="kpi"><span>Horas registradas</span><b>${num(tot.min, 'dur')}</b><small>média ${fmtNum(all.length ? tot.min / 60 / all.length : 0)}h/designer</small></div>
@@ -493,14 +511,14 @@ function viewMetricas() {
     <div class="card flush">
       <div class="c-head pad"><h3>Fechamento</h3><span>${esc(label)} · apenas cards validados compõem o valor</span><span class="sp"></span><button class="btn line sm" data-export-csv>${ico('sheet')}Exportar planilha</button></div>
       <div class="table-wrap"><table class="grid close">
-        <thead><tr><th>Designer</th><th class="num">Cards</th><th class="num">Pts validados</th><th class="num">Em revisão</th><th class="num">Pts/card</th><th class="num">Tempo/card</th><th class="num">Alta compl.</th><th class="num">Horas</th><th class="num">Média h/dia</th><th class="num">Buff</th><th class="num">Remuneração</th></tr></thead>
+        <thead><tr><th>Designer</th><th class="num">Cards</th><th class="num">Pts validados</th><th class="num">Em revisão</th><th class="num">Pts/card</th><th class="num">Tempo/card</th><th class="num">Alta compl.</th><th class="num">Horas</th>${BUFF_ON ? '<th class="num">Média h/dia</th><th class="num">Buff</th>' : ''}<th class="num">A receber</th></tr></thead>
         <tbody>${[...all].sort((a, b) => b.s.points - a.s.points).map(({ p, s }, i) => `<tr class="${p.id === m.id ? 'me' : ''}" style="--i:${i}">
           <td><div class="who-cell">${avatar(p, 'sm')}<span><b>${esc(p.name)}</b><small>${p.regime}</small></span></div></td>
           <td class="num">${s.cards}</td><td class="num"><b>${fmtPts(s.points)}</b></td><td class="num ${s.pending ? 'warn-t' : ''}">${s.pending || '—'}</td>
           <td class="num">${fmtNum(s.ptsPerCard)}</td><td class="num">${s.avgCardMins ? fmtDur(s.avgCardMins) : '—'}</td><td class="num">${s.hard || '—'}</td>
-          <td class="num">${fmtDur(s.minutes)}</td><td class="num">${fmtNum(s.buff.avgH)}h</td><td class="num">${s.buff.eligible ? `<span class="mult ${multCls(s.buff.mult)}">${fmtMult(s.buff.mult)}</span>` : '<span class="muted">CLT</span>'}</td>
+          <td class="num">${fmtDur(s.minutes)}</td>${BUFF_ON ? `<td class="num">${fmtNum(s.buff.avgH)}h</td><td class="num">${s.buff.eligible ? `<span class="mult ${multCls(s.buff.mult)}">${fmtMult(s.buff.mult)}</span>` : '<span class="muted">CLT</span>'}</td>` : ''}
           <td class="num money">${canSee(p) ? (s.pay == null ? 'fixo' : fmtBRL(s.pay)) : '•••'}</td></tr>`).join('')}</tbody>
-        ${admin ? `<tfoot><tr><td>Total</td><td class="num">${tot.cards}</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td></td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td><td></td><td></td><td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>` : ''}
+        ${admin ? `<tfoot><tr><td>Total</td><td class="num">${tot.cards}</td><td class="num">${fmtPts(tot.pts)}</td><td class="num">${tot.pend || '—'}</td><td></td><td></td><td></td><td class="num">${fmtDur(tot.min)}</td>${BUFF_ON ? '<td></td><td></td>' : ''}<td class="num money">${fmtBRL(tot.pay)}</td></tr></tfoot>` : ''}
       </table></div>
     </div>
   </section>`;
@@ -580,18 +598,18 @@ function cfgPontos() {
       ${cfgList('diffs', 'Complexidade', 'indicador visual · não altera a pontuação', ['color'], {})}
     </div>
     <div class="col">
-      <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>base de cálculo, sem buff</span></div>
+      <div class="card dark-card"><div class="c-head"><h3>Valor do ponto</h3><span>base de cálculo</span></div>
         <label class="pv"><span>R$</span><input type="number" min="0" step="0.1" data-setting="pointValue" value="${st.pointValue}"></label></div>
-      <div class="card"><div class="c-head"><h3>Faixas de buff</h3><span>PJ · média diária de horas no mês (dias corridos)</span></div>
+      ${BUFF_ON ? `<div class="card"><div class="c-head"><h3>Faixas de buff</h3><span>PJ · média diária de horas no mês (dias corridos)</span></div>
         <div class="tiers">${tierRows('buff', 'h', 'h/dia', 0.5)}</div><button class="btn line sm" data-add-tier="buff">${ico('plus')}Faixa</button>
-        <p class="muted small">Remuneração = pts validados × ${fmtBRL(st.pointValue)} × buff.</p></div>
+        <p class="muted small">Remuneração = pts validados × ${fmtBRL(st.pointValue)} × buff.</p></div>` : ''}
     </div>
   </div>`;
 }
 function cfgHoras() {
   const { days } = period(), today = dkey(new Date()), ds = designers();
   if (!ds.length) return '<div class="empty-card">Cadastre designers primeiro.</div>';
-  return `<div class="card flush"><div class="c-head pad"><h3>Horas online</h3><span>digite como 8:30 ou 8,5 · salva sozinho · fins de semana contam para o buff</span></div>
+  return `<div class="card flush"><div class="c-head pad"><h3>Horas online</h3><span>digite como 8:30 ou 8,5 · salva sozinho</span></div>
     <div class="table-wrap"><table class="hours">
       <thead><tr><th>Designer</th>${days.map(d => `<th class="${dkey(d) === today ? 'today' : ''}">${WD[d.getDay()]}<b>${d.getDate()}</b></th>`).join('')}${days.length > 1 ? '<th>Total</th>' : ''}</tr></thead>
       <tbody>${ds.map(p => { const tot = days.reduce((s, d) => s + onlineMin(p.id, dkey(d)), 0); return `<tr><td class="h-who">${avatar(p, 'sm')}<span>${esc(firstName(p.name))}</span></td>${days.map(d => { const k = dkey(d), v = onlineMin(p.id, k); return `<td class="${isWeekendDate(d) ? 'we' : ''}"><input class="hm ${v ? 'has' : ''}" data-online="${p.id}|${k}" value="${toHM(v)}" placeholder="—" inputmode="decimal"></td>`; }).join('')}${days.length > 1 ? `<td class="h-tot">${fmtDur(tot)}</td>` : ''}</tr>`; }).join('')}</tbody>
@@ -690,25 +708,23 @@ function saveCardFromForm(form, existing) {
 
 function bind() {
   document.addEventListener('pointerdown', ripple);
-  const GLASS = '.btn, .seg, .stepper, .icon-btn, .today-btn, .ab, .who, .select-pill, .search, .fab, .tile span, .pill span, .qt, .rail-nav button, .x, .summary>div, .kpi, .buff-card, .person, .alert-bar, .bt';
   document.addEventListener('pointermove', e => {
-    const g = e.target.closest && e.target.closest(GLASS); if (!g) return;
-    const r = g.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-    g.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); g.style.setProperty('--my', (y * 100).toFixed(1) + '%');
-    if (g.id === 'fab') { g.style.setProperty('--tx', ((x - .5) * 10).toFixed(1) + 'px'); g.style.setProperty('--ty', ((y - .5) * 10).toFixed(1) + 'px'); }
+    const g = e.target.closest && e.target.closest('.btn, .fab'); if (!g) return;
+    const r = g.getBoundingClientRect();
+    g.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+    g.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
   }, { passive: true });
-  $('#fab').addEventListener('pointerleave', e => { e.currentTarget.style.setProperty('--tx', '0px'); e.currentTarget.style.setProperty('--ty', '0px'); });
   document.addEventListener('click', e => {
     const t = e.target; let el;
     if ((el = t.closest('[data-step]'))) { const [id, d] = el.dataset.step.split('|'), inp = el.closest('form').elements['add_' + id]; inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + +d); inp.classList.remove('bump'); void inp.offsetWidth; inp.classList.add('bump'); refreshReceipt(el.closest('form')); return; }
     if ((el = t.closest('[data-qt]'))) { const f = el.closest('form'); f.elements.mins.value = toHM(+el.dataset.qt); f.querySelectorAll('.qt').forEach(q => q.classList.toggle('on', q === el)); refreshReceipt(f); return; }
     if (t.closest('dialog')) return;
     if ((el = t.closest('#nav [data-view]'))) { if (el.dataset.view === 'ranking') ui.day = ui.day || new Date(); go(el.dataset.view); return; }
-    if ((el = t.closest('[data-period]'))) { ui.limit = {}; ui.period = el.dataset.period; ui.enter = true; render(); return; }
-    if ((el = t.closest('[data-shift]'))) { shiftPeriod(+el.dataset.shift); ui.enter = true; render(); return; }
-    if ((el = t.closest('[data-rshift]'))) { const n = +el.dataset.rshift; ui.day = n ? addDays(ui.day, 7 * n) : new Date(); ui.enter = true; render(); return; }
+    if ((el = t.closest('[data-period]'))) { const v = el.dataset.period; if (v !== ui.period) smooth(() => { ui.limit = {}; ui.period = v; }); return; }
+    if ((el = t.closest('[data-shift]'))) { const n = +el.dataset.shift; smooth(() => shiftPeriod(n)); return; }
+    if ((el = t.closest('[data-rshift]'))) { const n = +el.dataset.rshift; smooth(() => { ui.day = n ? addDays(ui.day, 7 * n) : new Date(); }); return; }
     if ((el = t.closest('[data-status]'))) { ui.status = el.dataset.status; render(); return; }
-    if ((el = t.closest('[data-cfg]'))) { ui.cfg = el.dataset.cfg; ui.enter = true; render(); return; }
+    if ((el = t.closest('[data-cfg]'))) { const v = el.dataset.cfg; smooth(() => { ui.cfg = v; }); return; }
     if ((el = t.closest('[data-new-card]'))) { openNew(el.id === 'fab'); return; }
     if ((el = t.closest('[data-more]'))) { ui.limit[el.dataset.more] = (ui.limit[el.dataset.more] || 25) + 50; render(); return; }
     if ((el = t.closest('[data-hours]'))) { e.stopPropagation(); openHours(el.dataset.hours); return; }
@@ -725,7 +741,7 @@ function bind() {
     if ((el = t.closest('[data-edit-act]'))) { const a = act(el.dataset.editAct); if (a) openAct('edit', a); return; }
     if ((el = t.closest('[data-view-act]'))) { const a = act(el.dataset.viewAct); if (a) openAct('view', a); return; }
     if ((el = t.closest('[data-del-act]'))) { const a = act(el.dataset.delAct); if (a && confirm('Excluir este card?')) { S.activities = S.activities.filter(x => x !== a); save(); render(); toast('Excluído', 'info'); } return; }
-    if (t.closest('[data-go-pending]')) { ui.status = 'pendente'; ui.who = 'all'; go('atividades'); return; }
+    if (t.closest('[data-go-pending]')) { ui.status = 'todas'; ui.who = 'all'; go('atividades'); return; }
     if (t.closest('[data-export-csv]')) { exportCSV(); return; }
     if (t.closest('[data-add-person]')) { openPerson(); return; }
     if ((el = t.closest('[data-edit-person]'))) { openPerson(person(el.dataset.editPerson)); return; }
@@ -750,7 +766,7 @@ function bind() {
   document.addEventListener('change', e => {
     const t = e.target;
     if (t.id === 'meSel') { ui.meId = t.value; localStorage.setItem('dede.me', ui.meId); ui.who = 'all'; ui.draft = null; ui.enter = true; render(); toast(`Você está como ${firstName(me().name)}`, 'info'); return; }
-    if (t.matches('[data-who]')) { ui.who = t.value; ui.draft = null; ui.enter = true; render(); return; }
+    if (t.matches('[data-who]')) { const v = t.value; smooth(() => { ui.who = v; ui.draft = null; }); return; }
     if (t.matches('[data-online]')) {
       const [pid, k] = t.dataset.online.split('|'), min = parseHM(t.value);
       if (min > 24 * 60) { toast('Mais de 24h num dia? Confere.', 'warn'); t.value = toHM(onlineMin(pid, k)); return; }
@@ -846,7 +862,7 @@ function closeDlg(dl) { if (!dl.open) return; dl.classList.add('closing'); setTi
 function exportCSV() {
   const { from, to, label } = period();
   const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Nº lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Justificativa', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$, sem buff)'].join(';')];
+  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Nº lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Justificativa', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$)'].join(';')];
   for (const p of isAdmin() ? designers() : [me()]) {
     const s = stats(p.id, from, to);
     for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {

@@ -10,6 +10,9 @@ const KEY = 'dede.v1';
 const PALETTE = ['#F5A800', '#FF5A36', '#7B61FF', '#12B886', '#2F80ED', '#E64980', '#0B9E8A', '#FD7E14', '#5C7CFA', '#AE3EC9', '#495057', '#C2255C'];
 
 /* ---------- regras (o admin edita tudo em Configurações → Pontuação) ---------- */
+/* Buff desligado por enquanto: troque para true para reativar (o cálculo e as telas voltam juntos). */
+const BUFF_ON = false;
+
 const DEFAULT_SETTINGS = {
   pointValue: 3.0, // R$ por ponto
   /* tipo de atividade: a base do card */
@@ -150,7 +153,7 @@ function monthBuff(pid, ref) {
   let minutes = 0;
   for (let d = first; d <= last; d = addDays(d, 1)) minutes += onlineMin(pid, dkey(d));
   const avgH = minutes / 60 / days;
-  const eligible = !!p && p.regime === 'PJ';
+  const eligible = BUFF_ON && !!p && p.regime === 'PJ';
   const tiers = [...S.settings.buff].sort((a, b) => a.h - b.h);
   const next = tiers.find(t => t.h > avgH);
   const hMult = eligible ? buffMult(avgH) : 1;
