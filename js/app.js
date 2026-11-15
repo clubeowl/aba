@@ -231,14 +231,10 @@ function cardFields(c, opts = {}) {
   return `
     <div class="cf-group">
     <div class="cf-h"><b>1</b>Identificação</div>
-    <label class="f lulu-f"><span>Link do Lulu <em>opcional</em></span>
-      <div class="lulu-in">${ico('link')}<input name="luluLink" type="url" value="${esc(c.luluLink || '')}" placeholder="https://lulu.seubone.com/…" autocomplete="off" data-lulu><i class="lulu-st" aria-live="polite"></i></div>
-      <input type="hidden" name="deal" value="${esc(c.deal || '')}">
-    </label>
-    <p class="lulu-help">Os cards do Lulu não têm link próprio. Para puxar tudo de lá, arraste <a class="lulu-bm" href="${luluBmHref()}" data-bm>${ico('send')}Enviar pro Dedé</a> para a barra de favoritos, depois clique nele no Lulu e no card.</p>
+    <input type="hidden" name="deal" value="${esc(c.deal || '')}">
     <div class="cf-row r-main">
       <label class="f"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Marcelo zanoni 7612 +30 Com Logo (Turismo)" autocomplete="off"></label>
-      <label class="f"><span>Vendedor</span><input name="seller" value="${esc(c.seller || '')}" placeholder="quem criou o card no Lulu" list="clientList" autocomplete="off"></label>
+      <label class="f"><span>Vendedor</span><input name="seller" value="${esc(c.seller || '')}" placeholder="quem criou o card" list="clientList" autocomplete="off"></label>
     </div>
     <div class="cf-row r-meta ${admin ? 'adm' : ''}">
       ${admin ? `<label class="f"><span>Designer</span><select name="designerId">${designers().map(p => `<option value="${p.id}" ${p.id === c.designerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
@@ -299,61 +295,6 @@ function buffTip() {
   const t = S.settings.buff.slice().sort((a, b) => a.h - b.h);
   return `Multiplicador mensal aplicável a PJ. Média de horas por dia no mês, contando todos os dias corridos (inclusive fins de semana): ${t.map((x, i) => (t[i + 1] ? (x.h ? `${x.h}–${t[i + 1].h}h` : `até ${t[i + 1].h}h`) : `acima de ${x.h}h`) + ' ' + fmtMult(x.mult)).join(' · ')}.`;
 }
-/* ---------- Lulu: link do card ----------
-   1) lê o que der do próprio link (parâmetros e número do card);
-   2) tenta buscar o card no Lulu (só funciona se o Lulu liberar o acesso para este site);
-   3) também aceita abrir o Dedé com #registrar?card=…&vendedor=…&pedido=…&data=…&hora=…&link=… */
-const luluIdOf = link => { try { const u = new URL(link); const q = u.searchParams; const id = q.get('id') || q.get('card') && /^\d+$/.test(q.get('card')) && q.get('card'); if (id) return id; const m = (u.pathname + u.hash).match(/(\d{3,})(?!.*\d{3,})/); return m ? m[1] : ''; } catch (e) { return ''; } };
-function luluFromParams(q) {
-  const g = (...k) => { for (const x of k) { const v = q.get(x); if (v) return v.trim(); } return ''; };
-  let date = g('data', 'date', 'dia'), time = g('hora', 'time');
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(date)) { const [d, m, y] = date.split(/[\/ ]/); date = `${y}-${m}-${d}`; }
-  if (!time && /T\d{2}:\d{2}/.test(date)) { time = date.slice(11, 16); }
-  date = date.slice(0, 10);
-  return { seller: g('vendedor', 'seller', 'criado_por'), name: g('card', 'nome', 'name', 'titulo', 'title'), date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '', time: /^\d{2}:\d{2}/.test(time) ? time.slice(0, 5) : '' };
-}
-function luluFromJSON(j) {
-  const flat = {}; (function walk(o, d) { if (!o || typeof o !== 'object' || d > 3) return; for (const [k, v] of Object.entries(o)) { if (v && typeof v === 'object') walk(v, d + 1); else if (!(k.toLowerCase() in flat)) flat[k.toLowerCase()] = v; } })(j, 0);
-  const pick = (...k) => { for (const x of k) if (flat[x] != null && flat[x] !== '') return String(flat[x]); return ''; };
-  const when = pick('created_at', 'createdat', 'data', 'date', 'criado_em');
-  return { client: pick('cliente', 'client', 'customer', 'cliente_nome', 'client_name', 'customer_name', 'empresa'), name: pick('nome', 'name', 'titulo', 'title', 'card', 'card_name'), date: /^\d{4}-\d{2}-\d{2}/.test(when) ? when.slice(0, 10) : '', time: /T\d{2}:\d{2}/.test(when) ? when.slice(11, 16) : pick('hora', 'time').slice(0, 5) };
-}
-function luluLookup(link) {
-  let u; try { u = new URL(link); } catch (e) { return { ok: false, bad: true }; }
-  const d = luluFromParams(u.searchParams);
-  return { ok: !!(d.seller || d.name), noCard: /(^|\.)seubone\.com$/.test(u.hostname), ...d };
-}
-function fillFromLulu(form, d, force) {
-  const F = form.elements, set = (n, v) => { if (v && F[n] && (force || !F[n].value || F[n].dataset.auto)) { F[n].value = v; F[n].dataset.auto = '1'; F[n].closest('.f')?.classList.add('filled'); } };
-  set('seller', d.seller); set('name', d.name); set('date', d.date); set('time', d.time);
-  setTimeout(() => form.querySelectorAll('.f.filled').forEach(x => x.classList.remove('filled')), 900);
-  refreshReceipt(form);
-}
-const LULU_BM = "(function () {\nvar DEDE = '__DEDE__';\nvar M = ['janeiro','fevereiro','mar\u00e7o','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];\nvar tip = document.createElement('div');\ntip.textContent = 'Ded\u00e9: clique no card que voc\u00ea quer registrar (Esc cancela)';\ntip.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483647;background:#FDB913;color:#1a1a1a;font:600 13px/1.2 system-ui,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.35)';\ndocument.body.appendChild(tip);\nfunction done() { tip.remove(); document.removeEventListener('click', onClick, true); document.removeEventListener('keydown', onKey, true); }\nfunction onKey(e) { if (e.key === 'Escape') done(); }\nfunction txt(el, sel) { var x = el && el.querySelector(sel); return x ? x.textContent.replace(/\\s+/g, ' ').trim() : ''; }\nfunction onClick(e) {\nvar card = e.target.closest('[aria-roledescription=draggable]') || e.target.closest('tr');\nif (!card) return;\ndone();\nvar title = txt(card, 'p.font-medium') || txt(card, 'td');\nvar sub = txt(card, 'p.truncate');\nvar nome = (sub.split(' \u2022 ')[0] || title).trim();\nvar w = window.open('', 'dede');\nsetTimeout(function () {\nvar data = '', hora = '';\nvar dlg = Array.prototype.find.call(document.querySelectorAll('[role=dialog]'), function (d) { return d.innerText.indexOf(title) > -1; });\nvar m = (dlg ? dlg.innerText : '').match(/(\\d{1,2}) de ([a-z\u00e7]+)(?: de (\\d{4}))? \u00e0s (\\d{1,2}:\\d{2})/i);\nif (m) { data = (m[3] || new Date().getFullYear()) + '-' + String(M.indexOf(m[2].toLowerCase()) + 1).padStart(2, '0') + '-' + m[1].padStart(2, '0'); hora = m[4].padStart(5, '0'); }\nvar v = (dlg ? dlg.innerText : '').match(/Criado por ([^\\n\u2022]+)/i);\nvar q = new URLSearchParams({ card: nome, vendedor: v ? v[1].trim() : '', pedido: title, data: data, hora: hora, link: location.href });\nvar url = DEDE + '#registrar?' + q.toString();\nif (w) { w.location.href = url; w.focus(); } else location.href = url;\n}, 700);\n}\ndocument.addEventListener('click', onClick, true);\ndocument.addEventListener('keydown', onKey, true);\n})();";
-const luluBmHref = () => 'javascript:' + encodeURIComponent(LULU_BM.replace('__DEDE__', location.origin + location.pathname));
-let luluSeq = 0;
-async function onLuluLink(input) {
-  const form = input.closest('form'), st = form.querySelector('.lulu-st'), v = input.value.trim(), seq = ++luluSeq;
-  const show = (cls, txt) => { st.className = 'lulu-st ' + cls; st.textContent = txt; };
-  if (!v) return show('', '');
-  if (!/^https?:\/\//i.test(v)) return show('warn', 'Cole o link completo do card');
-  const d = luluLookup(v); if (seq !== luluSeq) return;
-  if (d.ok) { fillFromLulu(form, d); show('ok', 'Dados puxados do link'); }
-  else if (d.noCard) show('warn', 'Link salvo. Para puxar os dados, use o “Enviar pro Dedé” no Lulu.');
-  else show('ok', 'Link salvo');
-}
-function openFromHash() {
-  const h = location.hash; if (!h.startsWith('#registrar')) return;
-  const q = new URLSearchParams(h.split('?')[1] || ''); history.replaceState(null, '', location.pathname + location.search);
-  if (!designers().length) return;
-  openNew();
-  const form = $('#actForm'), link = q.get('link') || '';
-  if (link) { form.elements.luluLink.value = link; }
-  const d = luluFromParams(q), deal = q.get('pedido') || q.get('negocio') || '';
-  if (deal) form.elements.deal.value = deal;
-  if (d.seller || d.name || d.date) { fillFromLulu(form, d, true); const st = form.querySelector('.lulu-st'); st.className = 'lulu-st ok'; st.textContent = deal ? `Puxado do Lulu · ${deal}` : 'Puxado do Lulu'; }
-  else if (link) onLuluLink(form.elements.luluLink);
-}
 function newDesigner() {
   if (!isAdmin()) return me().id;
   if (ui.who !== 'all' && person(ui.who)) return ui.who;
@@ -383,7 +324,7 @@ function readCard(form) {
   const c = {
     designerId: F.designerId ? F.designerId.value : me().id,
     date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()),
-    client: '', seller: F.seller.value.trim(), name: F.name.value.trim(), luluLink: (F.luluLink ? F.luluLink.value.trim() : ''), deal: (F.deal ? F.deal.value.trim() : ''),
+    client: '', seller: F.seller.value.trim(), name: F.name.value.trim(), luluLink: '', deal: (F.deal ? F.deal.value.trim() : ''),
     kind: (F.kind && F.kind.value) || 'logo', logoQ: (F.logoQ && F.logoQ.value) || 'alta', adds,
     diff: (F.diff && F.diff.value) || 'moderado', mins: parseHM(F.mins.value), details: F.details.value.trim(),
   };
@@ -761,7 +702,7 @@ function saveCardFromForm(form, existing) {
   if (!c.name) { err('Qual o nome do card?'); const f = form.elements.name; f.focus(); f.closest('.f').classList.add('shake'); setTimeout(() => f.closest('.f').classList.remove('shake'), 500); return null; }
   const sc = scoreOf(c);
   const pts = admin && c.ptsOverride != null ? c.ptsOverride : sc.total;
-  const data = { designerId: c.designerId, date: c.date, time: c.time, client: (existing && existing.client) || '', seller: c.seller, name: c.name, luluLink: c.luluLink, deal: c.deal || (existing && existing.deal) || '', luluId: luluIdOf(c.luluLink) || (existing && existing.luluId) || '', kind: c.kind, logoQ: c.logoQ, adds: c.adds, diff: c.diff, mins: c.mins, details: c.details, pts };
+  const data = { designerId: c.designerId, date: c.date, time: c.time, client: (existing && existing.client) || '', seller: c.seller, name: c.name, luluLink: (existing && existing.luluLink) || '', deal: c.deal || (existing && existing.deal) || '', luluId: (existing && existing.luluId) || '', kind: c.kind, logoQ: c.logoQ, adds: c.adds, diff: c.diff, mins: c.mins, details: c.details, pts };
   if (existing) {
     Object.assign(existing, data);
     if (admin) { existing.status = form.elements.status.value; existing.note = form.elements.note.value.trim(); }
@@ -785,7 +726,6 @@ function bind() {
     const t = e.target; let el;
     if ((el = t.closest('[data-step]'))) { const [id, d] = el.dataset.step.split('|'), inp = el.closest('form').elements['add_' + id]; inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + +d); inp.classList.remove('bump'); void inp.offsetWidth; inp.classList.add('bump'); refreshReceipt(el.closest('form')); return; }
     if ((el = t.closest('[data-qt]'))) { const f = el.closest('form'); f.elements.mins.value = toHM(+el.dataset.qt); f.querySelectorAll('.qt').forEach(q => q.classList.toggle('on', q === el)); refreshReceipt(f); return; }
-    if (t.closest('[data-bm]')) { e.preventDefault(); toast('Arraste esse botão para a barra de favoritos do Chrome'); return; }
     if (t.closest('dialog')) return;
     if ((el = t.closest('#nav [data-view]'))) { if (el.dataset.view === 'ranking') ui.day = ui.day || new Date(); go(el.dataset.view); return; }
     if ((el = t.closest('[data-period]'))) { const v = el.dataset.period; if (v !== ui.period) smooth(() => { ui.limit = {}; ui.period = v; }); return; }
@@ -859,10 +799,9 @@ function bind() {
     if (t.closest('[data-cardform]')) { if (t.name === 'designerId' && actCtx && actCtx.mode === 'new') { const dlst = $('#clientList'); if (dlst) dlst.innerHTML = clientOpts(t.value); } refreshReceipt(t.closest('form')); }
   });
 
-  let qT, lT;
+  let qT;
   document.addEventListener('input', e => {
     if (e.target.matches('[data-q]')) { ui.q = e.target.value; clearTimeout(qT); qT = setTimeout(renderBlocks, 90); return; }
-    if (e.target.matches('[data-lulu]')) { clearTimeout(lT); const el = e.target; lT = setTimeout(() => onLuluLink(el), 350); return; }
     if (e.target.dataset.auto) delete e.target.dataset.auto;
     if (e.target.closest('[data-cardform]')) refreshReceipt(e.target.closest('form'));
   });
@@ -933,12 +872,12 @@ function closeDlg(dl) { if (!dl.open) return; dl.classList.add('closing'); setTi
 function exportCSV() {
   const { from, to, label } = period();
   const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Nome do card', 'Vendedor', 'Link do Lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Observações', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$)'].join(';')];
+  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Nome do card', 'Vendedor', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Observações', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$)'].join(';')];
   for (const p of isAdmin() ? designers() : [me()]) {
     const s = stats(p.id, from, to);
     for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
       const d = parseKey(a.date);
-      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.name || a.client), q(a.seller || ''), q(a.luluLink || a.luluId || ''), q(kindOf(a.kind).label), q(logoOf(a.logoQ).label), ...S.settings.adds.map(ad => (a.adds || {})[ad.id] || 0), diffOf(a.diff).label, a.mins || 0, q(a.details), n(a.pts), STATUS[a.status].label, q(a.note), p.payByPoints && a.status === 'aprovada' ? n((a.pts * S.settings.pointValue).toFixed(2)) : ''].join(';'));
+      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.name || a.client), q(a.seller || ''), q(kindOf(a.kind).label), q(logoOf(a.logoQ).label), ...S.settings.adds.map(ad => (a.adds || {})[ad.id] || 0), diffOf(a.diff).label, a.mins || 0, q(a.details), n(a.pts), STATUS[a.status].label, q(a.note), p.payByPoints && a.status === 'aprovada' ? n((a.pts * S.settings.pointValue).toFixed(2)) : ''].join(';'));
     }
   }
   const el = document.createElement('a');
@@ -956,4 +895,4 @@ function io(kind) {
 
 window.dede = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
 
-(function init() { S = load() || normalize({}); save(); bind(); render(); openFromHash(); addEventListener('hashchange', openFromHash); })();
+(function init() { S = load() || normalize({}); save(); bind(); render(); })();
