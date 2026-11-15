@@ -59,6 +59,8 @@ const I = {
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  send: '<path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/>',
   sheet: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
   left: '<path d="M15 18l-6-6 6-6"/>',
   right: '<path d="M9 18l6-6-6-6"/>',
@@ -148,10 +150,7 @@ function countUp() {
   });
 }
 const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-function smooth(fn) {
-  const run = () => { fn(); render(); };
-  if (document.startViewTransition && !calm()) document.startViewTransition(run); else run();
-}
+function smooth(fn) { fn(); render(); }
 function go(view) { if (view === ui.view) { render(); return; } scrollTo({ top: 0 }); smooth(() => { ui.view = view; ui.enter = true; }); }
 
 /* ============================================================
@@ -170,10 +169,15 @@ function viewAtividades() {
     ${summary(ppl, from, to)}
     <div class="filters">
       ${isAdmin() ? `<label class="select-pill">${ico('users')}<select data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${ico('chev')}</label>` : ''}
-      <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, nº lulu…" value="${esc(ui.q)}" data-q></label>
+      <label class="search">${ico('search')}<input type="search" placeholder="Buscar cliente, card, link do Lulu…" value="${esc(ui.q)}" data-q></label>
     </div>
-    ${ppl.map((p, i) => block(p, from, to, i)).join('')}
+    <div id="blocks">${ppl.map((p, i) => block(p, from, to, i)).join('')}</div>
   </section>`;
+}
+function renderBlocks() {
+  const box = $('#blocks'); if (!box) return render();
+  const { from, to } = period();
+  box.innerHTML = visiblePeople().map((p, i) => block(p, from, to, i)).join('');
 }
 
 function welcome() {
@@ -227,6 +231,11 @@ function cardFields(c, opts = {}) {
   return `
     <div class="cf-group">
     <div class="cf-h"><b>1</b>Identificação</div>
+    <label class="f lulu-f"><span>Link do Lulu <em>opcional</em></span>
+      <div class="lulu-in">${ico('link')}<input name="luluLink" type="url" value="${esc(c.luluLink || '')}" placeholder="https://lulu.seubone.com/…" autocomplete="off" data-lulu><i class="lulu-st" aria-live="polite"></i></div>
+      <input type="hidden" name="deal" value="${esc(c.deal || '')}">
+    </label>
+    <p class="lulu-help">Os cards do Lulu não têm link próprio. Para puxar tudo de lá, arraste <a class="lulu-bm" href="${luluBmHref()}" data-bm>${ico('send')}Enviar pro Dedé</a> para a barra de favoritos, depois clique nele no Lulu e no card.</p>
     <div class="cf-row r-main">
       <label class="f"><span>Cliente</span><input name="client" value="${esc(c.client)}" placeholder="Nome do cliente" list="clientList" autocomplete="off"></label>
       <label class="f"><span>Nome do card</span><input name="name" value="${esc(c.name || '')}" placeholder="ex.: Trucker evento verão" autocomplete="off"></label>
@@ -235,7 +244,6 @@ function cardFields(c, opts = {}) {
       ${admin ? `<label class="f"><span>Designer</span><select name="designerId">${designers().map(p => `<option value="${p.id}" ${p.id === c.designerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>` : ''}
       <label class="f"><span>Dia</span><input type="date" name="date" value="${c.date}"></label>
       <label class="f"><span>Hora</span><input type="time" name="time" value="${c.time || ''}"></label>
-      <label class="f"><span>Nº lulu <em>opcional</em></span><input name="luluId" value="${esc(c.luluId || '')}" placeholder="ex.: 48213" inputmode="numeric"></label>
     </div>
     </div>
     <div class="cf-group">
@@ -265,7 +273,7 @@ function cardFields(c, opts = {}) {
       <div class="cf-sec">
         <div class="cf-lbl">Tempo de execução</div>
         <div class="time-row"><label class="f t-in">${ico('timer')}<input name="mins" value="${toHM(c.mins)}" placeholder="0:45" inputmode="decimal"></label>
-          ${[15, 30, 45, 60, 90, 120].map(m => `<button type="button" class="qt" data-qt="${m}">${m < 60 ? m + 'min' : fmtDur(m).replace('h00', 'h')}</button>`).join('')}</div>
+          ${[3, 5, 15, 30, 45, 60, 90, 120].map(m => `<button type="button" class="qt" data-qt="${m}">${m < 60 ? m + 'min' : fmtDur(m).replace('h00', 'h')}</button>`).join('')}</div>
       </div>
     </div>
     <div class="cf-sec">
@@ -291,6 +299,62 @@ function buffTip() {
   const t = S.settings.buff.slice().sort((a, b) => a.h - b.h);
   return `Multiplicador mensal aplicável a PJ. Média de horas por dia no mês, contando todos os dias corridos (inclusive fins de semana): ${t.map((x, i) => (t[i + 1] ? (x.h ? `${x.h}–${t[i + 1].h}h` : `até ${t[i + 1].h}h`) : `acima de ${x.h}h`) + ' ' + fmtMult(x.mult)).join(' · ')}.`;
 }
+/* ---------- Lulu: link do card ----------
+   1) lê o que der do próprio link (parâmetros e número do card);
+   2) tenta buscar o card no Lulu (só funciona se o Lulu liberar o acesso para este site);
+   3) também aceita abrir o Dedé com #registrar?link=…&cliente=…&card=…&data=…&hora=… */
+const luluIdOf = link => { try { const u = new URL(link); const q = u.searchParams; const id = q.get('id') || q.get('card') && /^\d+$/.test(q.get('card')) && q.get('card'); if (id) return id; const m = (u.pathname + u.hash).match(/(\d{3,})(?!.*\d{3,})/); return m ? m[1] : ''; } catch (e) { return ''; } };
+function luluFromParams(q) {
+  const g = (...k) => { for (const x of k) { const v = q.get(x); if (v) return v.trim(); } return ''; };
+  let date = g('data', 'date', 'dia'), time = g('hora', 'time');
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(date)) { const [d, m, y] = date.split(/[\/ ]/); date = `${y}-${m}-${d}`; }
+  if (!time && /T\d{2}:\d{2}/.test(date)) { time = date.slice(11, 16); }
+  date = date.slice(0, 10);
+  return { client: g('cliente', 'client', 'customer'), name: g('nome', 'card', 'name', 'titulo', 'title'), date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '', time: /^\d{2}:\d{2}/.test(time) ? time.slice(0, 5) : '' };
+}
+function luluFromJSON(j) {
+  const flat = {}; (function walk(o, d) { if (!o || typeof o !== 'object' || d > 3) return; for (const [k, v] of Object.entries(o)) { if (v && typeof v === 'object') walk(v, d + 1); else if (!(k.toLowerCase() in flat)) flat[k.toLowerCase()] = v; } })(j, 0);
+  const pick = (...k) => { for (const x of k) if (flat[x] != null && flat[x] !== '') return String(flat[x]); return ''; };
+  const when = pick('created_at', 'createdat', 'data', 'date', 'criado_em');
+  return { client: pick('cliente', 'client', 'customer', 'cliente_nome', 'client_name', 'customer_name', 'empresa'), name: pick('nome', 'name', 'titulo', 'title', 'card', 'card_name'), date: /^\d{4}-\d{2}-\d{2}/.test(when) ? when.slice(0, 10) : '', time: /T\d{2}:\d{2}/.test(when) ? when.slice(11, 16) : pick('hora', 'time').slice(0, 5) };
+}
+function luluLookup(link) {
+  let u; try { u = new URL(link); } catch (e) { return { ok: false, bad: true }; }
+  const d = luluFromParams(u.searchParams);
+  return { ok: !!(d.client || d.name), noCard: /(^|\.)seubone\.com$/.test(u.hostname), ...d };
+}
+function fillFromLulu(form, d, force) {
+  const F = form.elements, set = (n, v) => { if (v && F[n] && (force || !F[n].value || F[n].dataset.auto)) { F[n].value = v; F[n].dataset.auto = '1'; F[n].closest('.f')?.classList.add('filled'); } };
+  set('client', d.client); set('name', d.name); set('date', d.date); set('time', d.time);
+  setTimeout(() => form.querySelectorAll('.f.filled').forEach(x => x.classList.remove('filled')), 900);
+  refreshReceipt(form);
+}
+const LULU_BM = "(function () {\nvar DEDE = '__DEDE__';\nvar M = ['janeiro','fevereiro','mar\u00e7o','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];\nvar tip = document.createElement('div');\ntip.textContent = 'Ded\u00e9: clique no card que voc\u00ea quer registrar (Esc cancela)';\ntip.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483647;background:#FDB913;color:#1a1a1a;font:600 13px/1.2 system-ui,sans-serif;padding:10px 16px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.35)';\ndocument.body.appendChild(tip);\nfunction done() { tip.remove(); document.removeEventListener('click', onClick, true); document.removeEventListener('keydown', onKey, true); }\nfunction onKey(e) { if (e.key === 'Escape') done(); }\nfunction txt(el, sel) { var x = el && el.querySelector(sel); return x ? x.textContent.replace(/\\s+/g, ' ').trim() : ''; }\nfunction onClick(e) {\nvar card = e.target.closest('[aria-roledescription=draggable]') || e.target.closest('tr');\nif (!card) return;\ndone();\nvar title = txt(card, 'p.font-medium') || txt(card, 'td');\nvar sub = txt(card, 'p.truncate');\nvar parts = sub.split(' \u2022 ');\nvar negocio = (parts[0] || '').trim(), cliente = (parts[1] || parts[0] || '').trim();\nvar w = window.open('', 'dede');\nsetTimeout(function () {\nvar data = '', hora = '';\nvar dlg = Array.prototype.find.call(document.querySelectorAll('[role=dialog]'), function (d) { return d.innerText.indexOf(title) > -1; });\nvar m = (dlg ? dlg.innerText : '').match(/(\\d{1,2}) de ([a-z\u00e7]+)(?: de (\\d{4}))? \u00e0s (\\d{1,2}:\\d{2})/i);\nif (m) { data = (m[3] || new Date().getFullYear()) + '-' + String(M.indexOf(m[2].toLowerCase()) + 1).padStart(2, '0') + '-' + m[1].padStart(2, '0'); hora = m[4].padStart(5, '0'); }\nvar q = new URLSearchParams({ cliente: cliente, card: title, negocio: negocio, data: data, hora: hora, link: location.href });\nvar url = DEDE + '#registrar?' + q.toString();\nif (w) { w.location.href = url; w.focus(); } else location.href = url;\n}, 700);\n}\ndocument.addEventListener('click', onClick, true);\ndocument.addEventListener('keydown', onKey, true);\n})();";
+const luluBmHref = () => 'javascript:' + encodeURIComponent(LULU_BM.replace('__DEDE__', location.origin + location.pathname));
+let luluSeq = 0;
+async function onLuluLink(input) {
+  const form = input.closest('form'), st = form.querySelector('.lulu-st'), v = input.value.trim(), seq = ++luluSeq;
+  const show = (cls, txt) => { st.className = 'lulu-st ' + cls; st.textContent = txt; };
+  if (!v) return show('', '');
+  if (!/^https?:\/\//i.test(v)) return show('warn', 'Cole o link completo do card');
+  const d = luluLookup(v); if (seq !== luluSeq) return;
+  if (d.ok) { fillFromLulu(form, d); show('ok', 'Dados puxados do link'); }
+  else if (d.noCard) show('warn', 'Link salvo. Para puxar os dados, use o “Enviar pro Dedé” no Lulu.');
+  else show('ok', 'Link salvo');
+}
+function openFromHash() {
+  const h = location.hash; if (!h.startsWith('#registrar')) return;
+  const q = new URLSearchParams(h.split('?')[1] || ''); history.replaceState(null, '', location.pathname + location.search);
+  if (!designers().length) return;
+  openNew();
+  const form = $('#actForm'), link = q.get('link') || '';
+  if (link) { form.elements.luluLink.value = link; }
+  const d = luluFromParams(q), deal = q.get('negocio') || '';
+  if (!d.client && deal) d.client = deal;
+  if (deal) form.elements.deal.value = deal;
+  if (d.client || d.name || d.date) { fillFromLulu(form, d, true); const st = form.querySelector('.lulu-st'); st.className = 'lulu-st ok'; st.textContent = deal ? `Puxado do Lulu · ${deal}` : 'Puxado do Lulu'; }
+  else if (link) onLuluLink(form.elements.luluLink);
+}
 function newDesigner() {
   if (!isAdmin()) return me().id;
   if (ui.who !== 'all' && person(ui.who)) return ui.who;
@@ -304,9 +368,11 @@ function openNew(fromFab) {
   actCtx = { mode: 'new' };
   $('#actForm').innerHTML = `
     <header><div class="dlg-title"><span class="q-ico">${ico('plus')}</span><div><h2>Registrar card</h2><p>${admin ? 'Registros feitos pela gestão entram validados.' : 'O registro segue para validação da gestão. A pontuação é calculada automaticamente.'}</p></div></div><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
-    <fieldset class="cp-grid dlg"><div class="cp-fields">${cardFields(c)}</div>${receipt(c)}</fieldset>
+    <div class="dlg-body">
+      <fieldset class="cp-grid dlg"><div class="cp-fields">${cardFields(c)}</div>${receipt(c)}</fieldset>
+      <p class="err" id="actErr" role="alert"></p>
+    </div>
     <datalist id="clientList">${clientOpts(did)}</datalist>
-    <p class="err" id="actErr" role="alert"></p>
     <footer><span class="k-hint"><i class="hint-dot">i</i>Pontuação estimada, sujeita à validação da gestão.</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button></footer>`;
   const dl = $('#actDlg'); if (!dl.open) { dl.classList.toggle('from-fab', !!fromFab); dl.showModal(); }
   $('#actForm').scrollTop = 0;
@@ -318,7 +384,7 @@ function readCard(form) {
   const c = {
     designerId: F.designerId ? F.designerId.value : me().id,
     date: F.date.value || dkey(new Date()), time: F.time.value || hm(new Date()),
-    client: F.client.value.trim(), name: F.name.value.trim(), luluId: F.luluId.value.trim(),
+    client: F.client.value.trim(), name: F.name.value.trim(), luluLink: (F.luluLink ? F.luluLink.value.trim() : ''), deal: (F.deal ? F.deal.value.trim() : ''),
     kind: (F.kind && F.kind.value) || 'logo', logoQ: (F.logoQ && F.logoQ.value) || 'alta', adds,
     diff: (F.diff && F.diff.value) || 'moderado', mins: parseHM(F.mins.value), details: F.details.value.trim(),
   };
@@ -344,7 +410,7 @@ function block(p, from, to, idx) {
   const rate = p.payByPoints ? S.settings.pointValue : null;
   let rows = s.acts.slice();
   if (ui.status !== 'todas') rows = rows.filter(a => a.status === ui.status);
-  if (ui.q) { const q = ui.q.toLowerCase(); rows = rows.filter(a => `${a.client} ${a.name} ${a.luluId} ${kindOf(a.kind).label} ${a.details}`.toLowerCase().includes(q)); }
+  if (ui.q) { const q = ui.q.toLowerCase(); rows = rows.filter(a => `${a.client} ${a.name} ${a.deal || ''} ${a.luluId} ${a.luluLink || ''} ${kindOf(a.kind).label} ${a.details}`.toLowerCase().includes(q)); }
   rows.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const pendN = s.acts.filter(a => a.status === 'pendente').length;
   const lim = ui.limit[p.id] || 25, rest = rows.length - lim;
@@ -401,7 +467,7 @@ function cardRow(a, i, rate, admin, m) {
     <div class="c-date">${fmtDay(a.date)}</div>
     <div class="c-time">${esc(a.time || '—')}</div>
     <div class="c-client" title="${esc(a.client || '')}">${esc(a.client || '—')}</div>
-    <div class="c-card"><span title="${esc(a.name || '')}${a.luluId ? ` · lulu #${esc(a.luluId)}` : ''}">${a.name ? esc(a.name) : '<i>sem nome</i>'}${a.luluId ? `<small>#${esc(a.luluId)}</small>` : ''}</span>${a.details ? `<i class="c-note" tabindex="0" data-tip="${esc(a.details)}">${ico('note')}</i>` : ''}</div>
+    <div class="c-card"><span title="${esc(a.name || '')}${a.deal ? ' · ' + esc(a.deal) : ''}">${a.name ? esc(a.name) : '<i>sem nome</i>'}${!a.luluLink && a.luluId ? `<small>#${esc(a.luluId)}</small>` : ''}</span>${a.luluLink ? `<a class="c-link" href="${esc(a.luluLink)}" target="_blank" rel="noopener" data-tip="Abrir no Lulu">${ico('link')}</a>` : ''}${a.details ? `<i class="c-note" tabindex="0" data-tip="${esc(a.details)}">${ico('note')}</i>` : ''}</div>
     <div class="c-kind"><span class="tag" style="--tc:${k.color}"><i></i>${esc(k.label)}</span>${mods.length ? `<span class="mods-n" tabindex="0" data-tip="${esc(modTip)}">+${mods.length}</span>` : ''}</div>
     <div class="c-diff"><span class="dff" style="--dc:${d.color}"><i></i>${esc(d.label)}</span></div>
     <div class="num c-mins">${a.mins ? fmtDur(a.mins) : '—'}</div>
@@ -636,10 +702,12 @@ function openAct(mode, a) {
   const sc = scoreOf(a), override = Math.abs(sc.total - a.pts) > 0.001 ? a.pts : null;
   $('#actForm').innerHTML = `
     <header><h2>${titles[mode]}</h2><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
-    ${hint ? `<p class="dlg-hint">${esc(hint)}</p>` : ''}
-    <fieldset class="cp-grid dlg" ${ro ? 'disabled' : ''}><div class="cp-fields">${cardFields(a)}</div>${receipt(a, { override })}</fieldset>
-    ${admin ? `<div class="adm-box"><label class="f"><span>Status</span><select name="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${(mode === 'erro' || mode === 'recusada' ? mode : a.status) === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label><label class="f"><span>Parecer para o designer</span><input name="note" value="${esc(a.note || '')}" placeholder="ex.: a logo não era de baixa qualidade" autocomplete="off"></label></div>` : ''}
-    <p class="err" id="actErr" role="alert"></p>
+    <div class="dlg-body">
+      ${hint ? `<p class="dlg-hint">${esc(hint)}</p>` : ''}
+      <fieldset class="cp-grid dlg" ${ro ? 'disabled' : ''}><div class="cp-fields">${cardFields(a)}</div>${receipt(a, { override })}</fieldset>
+      ${admin ? `<div class="adm-box"><label class="f"><span>Status</span><select name="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${(mode === 'erro' || mode === 'recusada' ? mode : a.status) === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label><label class="f"><span>Parecer para o designer</span><input name="note" value="${esc(a.note || '')}" placeholder="ex.: a logo não era de baixa qualidade" autocomplete="off"></label></div>` : ''}
+      <p class="err" id="actErr" role="alert"></p>
+    </div>
     <footer>${admin ? '<button type="button" class="btn line danger" id="delAct">Excluir</button>' : ''}<span class="sp"></span><button type="button" class="btn line" data-close>${ro ? 'Fechar' : 'Cancelar'}</button>${ro ? '' : '<button type="submit" class="btn dark">Salvar</button>'}</footer>`;
   $('#actDlg').showModal();
   const f = (mode === 'erro' || mode === 'recusada') ? $('#actForm').elements.note : null;
@@ -694,7 +762,7 @@ function saveCardFromForm(form, existing) {
   if (!c.client) { err('Qual o cliente?'); const f = form.elements.client; f.focus(); f.closest('.f').classList.add('shake'); setTimeout(() => f.closest('.f').classList.remove('shake'), 500); return null; }
   const sc = scoreOf(c);
   const pts = admin && c.ptsOverride != null ? c.ptsOverride : sc.total;
-  const data = { designerId: c.designerId, date: c.date, time: c.time, client: c.client, name: c.name, luluId: c.luluId, kind: c.kind, logoQ: c.logoQ, adds: c.adds, diff: c.diff, mins: c.mins, details: c.details, pts };
+  const data = { designerId: c.designerId, date: c.date, time: c.time, client: c.client, name: c.name, luluLink: c.luluLink, deal: c.deal || (existing && existing.deal) || '', luluId: luluIdOf(c.luluLink) || (existing && existing.luluId) || '', kind: c.kind, logoQ: c.logoQ, adds: c.adds, diff: c.diff, mins: c.mins, details: c.details, pts };
   if (existing) {
     Object.assign(existing, data);
     if (admin) { existing.status = form.elements.status.value; existing.note = form.elements.note.value.trim(); }
@@ -718,6 +786,7 @@ function bind() {
     const t = e.target; let el;
     if ((el = t.closest('[data-step]'))) { const [id, d] = el.dataset.step.split('|'), inp = el.closest('form').elements['add_' + id]; inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + +d); inp.classList.remove('bump'); void inp.offsetWidth; inp.classList.add('bump'); refreshReceipt(el.closest('form')); return; }
     if ((el = t.closest('[data-qt]'))) { const f = el.closest('form'); f.elements.mins.value = toHM(+el.dataset.qt); f.querySelectorAll('.qt').forEach(q => q.classList.toggle('on', q === el)); refreshReceipt(f); return; }
+    if (t.closest('[data-bm]')) { e.preventDefault(); toast('Arraste esse botão para a barra de favoritos do Chrome'); return; }
     if (t.closest('dialog')) return;
     if ((el = t.closest('#nav [data-view]'))) { if (el.dataset.view === 'ranking') ui.day = ui.day || new Date(); go(el.dataset.view); return; }
     if ((el = t.closest('[data-period]'))) { const v = el.dataset.period; if (v !== ui.period) smooth(() => { ui.limit = {}; ui.period = v; }); return; }
@@ -791,8 +860,11 @@ function bind() {
     if (t.closest('[data-cardform]')) { if (t.name === 'designerId' && actCtx && actCtx.mode === 'new') { const dlst = $('#clientList'); if (dlst) dlst.innerHTML = clientOpts(t.value); } refreshReceipt(t.closest('form')); }
   });
 
+  let qT, lT;
   document.addEventListener('input', e => {
-    if (e.target.matches('[data-q]')) { ui.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('[data-q]'); n.focus(); n.setSelectionRange(pos, pos); return; }
+    if (e.target.matches('[data-q]')) { ui.q = e.target.value; clearTimeout(qT); qT = setTimeout(renderBlocks, 90); return; }
+    if (e.target.matches('[data-lulu]')) { clearTimeout(lT); const el = e.target; lT = setTimeout(() => onLuluLink(el), 350); return; }
+    if (e.target.dataset.auto) delete e.target.dataset.auto;
     if (e.target.closest('[data-cardform]')) refreshReceipt(e.target.closest('form'));
   });
 
@@ -862,12 +934,12 @@ function closeDlg(dl) { if (!dl.open) return; dl.classList.add('closing'); setTi
 function exportCSV() {
   const { from, to, label } = period();
   const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Nº lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Justificativa', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$)'].join(';')];
+  const lines = [['Designer', 'Regime', 'Dia', 'Hora', 'Cliente', 'Nome do card', 'Link do Lulu', 'Tipo de atividade', 'Arquivo de logo', ...S.settings.adds.map(a => a.label), 'Complexidade', 'Tempo (min)', 'Justificativa', 'Pontos', 'Status', 'Parecer da gestão', 'Valor (R$)'].join(';')];
   for (const p of isAdmin() ? designers() : [me()]) {
     const s = stats(p.id, from, to);
     for (const a of s.acts.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time))) {
       const d = parseKey(a.date);
-      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), q(a.name), a.luluId, q(kindOf(a.kind).label), q(logoOf(a.logoQ).label), ...S.settings.adds.map(ad => (a.adds || {})[ad.id] || 0), diffOf(a.diff).label, a.mins || 0, q(a.details), n(a.pts), STATUS[a.status].label, q(a.note), p.payByPoints && a.status === 'aprovada' ? n((a.pts * S.settings.pointValue).toFixed(2)) : ''].join(';'));
+      lines.push([q(p.name), p.regime, `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`, a.time, q(a.client), q(a.name), q(a.luluLink || a.luluId || ''), q(kindOf(a.kind).label), q(logoOf(a.logoQ).label), ...S.settings.adds.map(ad => (a.adds || {})[ad.id] || 0), diffOf(a.diff).label, a.mins || 0, q(a.details), n(a.pts), STATUS[a.status].label, q(a.note), p.payByPoints && a.status === 'aprovada' ? n((a.pts * S.settings.pointValue).toFixed(2)) : ''].join(';'));
     }
   }
   const el = document.createElement('a');
@@ -885,4 +957,4 @@ function io(kind) {
 
 window.dede = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
 
-(function init() { S = load() || normalize({}); save(); bind(); render(); })();
+(function init() { S = load() || normalize({}); save(); bind(); render(); openFromHash(); addEventListener('hashchange', openFromHash); })();

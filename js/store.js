@@ -68,7 +68,7 @@ const round2 = n => Math.round(n * 100) / 100;
 /* ---------- estado ----------
    people: [{id, name, role:'admin'|'designer', regime:'CLT'|'PJ'|'ADM', color, email, payByPoints}]
    activities (cards): [{
-     id, designerId, date, time, client, name (nome do card), luluId,
+     id, designerId, date, time, client, name (nome do card), luluLink (link do card no Lulu), luluId,
      kind, logoQ, adds:{variacao, mud_logo, mud_layout}, diff, mins, details,
      pts (pontuação final), ptsOverride (true se a gestão ajustou),
      status:'pendente'|'aprovada'|'erro'|'recusada', note (comentário da gestão), createdAt, by }]
@@ -196,7 +196,7 @@ function receiveFromLulu(payload) {
     if (!p || !p.cliente) continue;
     const who = S.people.find(x => x.role === 'designer' && [norm(x.name), norm(x.email)].includes(norm(p.designer)));
     if (!who) continue;
-    const c = { id: uid(), designerId: who.id, date: dkey(now), time: hm(now), client: String(p.cliente), name: p.nome || '', luluId: p.lulu_id ? String(p.lulu_id) : '', kind: p.tipo || 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: 'veio do lulu', status: 'pendente', note: '', createdAt: now.toISOString(), by: 'lulu' };
+    const c = { id: uid(), designerId: who.id, date: dkey(now), time: hm(now), client: String(p.cliente), name: p.nome || '', luluLink: p.link || '', luluId: p.lulu_id ? String(p.lulu_id) : '', kind: p.tipo || 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: 'veio do lulu', status: 'pendente', note: '', createdAt: now.toISOString(), by: 'lulu' };
     c.pts = scoreOf(c).total; S.activities.push(c); out.push(c);
   }
   return out;
