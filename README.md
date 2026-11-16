@@ -46,6 +46,23 @@ Desativado por enquanto. Para religar, troque `BUFF_ON` para `true` no início d
 
 **A receber** = pontos validados × valor do ponto (R$ 3,00).
 
+## Ponte do Lulu (extensão do Chrome)
+
+Quando o designer confirma **Concluído** num card do Pipe Design do Lulu, o card aparece no Dedé em
+"Do Lulu · aguardando pontuação", já com **nome do card, dia e hora**. O vendedor fica em branco.
+É só clicar, marcar a pontuação e registrar.
+
+Instalar (uma vez, em cada computador):
+1. Baixe `tools/dede-ponte-lulu.zip` (ou em Configurações → Dados → Baixar extensão) e descompacte.
+2. No Chrome, abra `chrome://extensions`, ligue o **Modo do desenvolvedor**.
+3. Clique em **Carregar sem compactação** e escolha a pasta descompactada.
+
+A extensão só observa o clique no ✓ Concluir / "Confirmar Concluído" e espera o Lulu mostrar
+"Solicitação encerrada". Ela não muda nada no Lulu. Os cards ficam guardados na extensão até o Dedé
+abrir neste mesmo navegador.
+
+O ponto vale **R$ 2,00** por padrão (a gestão pode mudar em Configurações → Pontuação).
+
 ## Publicar no GitHub Pages
 
 Suba os arquivos (`index.html`, `css/`, `js/`, `img/`) num repositório e vá em **Settings → Pages → Deploy from a branch → main / (root)**.
