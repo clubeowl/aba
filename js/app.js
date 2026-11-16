@@ -334,7 +334,7 @@ function openNew(fromFab, draftId) {
       <p class="err" id="actErr" role="alert"></p>
     </div>
     <datalist id="clientList">${clientOpts(did)}</datalist>
-    <footer><span class="k-hint"><i class="hint-dot">i</i>Pontuação estimada, sujeita à validação da gestão.</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button></footer>`;
+    <footer><span class="k-hint"><i class="hint-dot">i</i>Pontuação estimada, sujeita à validação da gestão.</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button>${ui.lulu ? '' : '<button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button>'}</footer>`;
   const dl = $('#actDlg'); if (!dl.open) { dl.classList.toggle('from-fab', !!fromFab); dl.showModal(); }
   $('#actForm').scrollTop = 0;
   if (dr) { const k = $('#actForm').querySelector('input[name="kind"]:checked') || $('#actForm').querySelector('input[name="kind"]'); k && k.focus(); }
@@ -856,6 +856,7 @@ function bind() {
       save();
       ui.draft = { ...emptyCard(n.designerId), date: n.date };
       const again = e.submitter && e.submitter.name === 'again';
+      if (ui.lulu) { const k = ui.lulu.key; ui.lulu = null; window.postMessage({ src: 'dede-app', type: 'registrado', key: k, name: n.name, pts: fmtPts(n.pts), valor: fmtBRL(n.pts * S.settings.pointValue) }, location.origin); }
       const next = dr && myDrafts()[0];
       if (again) { render(); openNew(false, next ? next.id : null); } else { closeDlg($('#actDlg')); render(); }
       toast(`Card registrado · ${fmtPts(n.pts)} pts${isAdmin() ? ' · validado' : ' · em revisão'}`);
@@ -928,12 +929,35 @@ function io(kind) {
 window.addEventListener('message', e => {
   if (e.source !== window || !e.data || e.data.src !== 'dede-ponte') return;
   if (e.data.type === 'fila' && Array.isArray(e.data.cards)) {
+    const fresh = load(); if (fresh) S = fresh;   // pega o que outras abas já salvaram
     const got = addDrafts(e.data.cards, me()), novos = got.filter(d => !d.dup);
-    if (novos.length) { save(); render(); toast(novos.length === 1 ? `Do Lulu: ${novos[0].name}` : `${novos.length} cards do Lulu para pontuar`); }
+    if (novos.length) { save(); if (!$('#actDlg').open) render(); if (!e.data.abrir) toast(novos.length === 1 ? `Do Lulu: ${novos[0].name}` : `${novos.length} cards do Lulu para pontuar`); }
     window.postMessage({ src: 'dede-app', type: 'ack', keys: got.map(d => d.key) }, location.origin);
   }
+  if (e.data.type === 'abrir' && e.data.key) { let n = 0; const tryOpen = () => { const fresh = load(); if (fresh) S = fresh; if (!openFromLulu(e.data.key, n < 8) && n++ < 8) setTimeout(tryOpen, 400); }; tryOpen(); }
   if (e.data.type === 'hello') { document.documentElement.dataset.dedePonte = '1'; if (ui.view === 'config' && ui.cfg === 'dados') render(); }
+});
+/* aberto pela extensão logo depois do OK no Lulu: vai direto para o registro daquele card */
+function openFromLulu(key, quiet) {
+  const d = S.drafts.find(x => x.key === key);
+  if (!d) {
+    const a = S.activities.find(x => x.luluId && x.luluId === key);
+    if (a) { toast('Esse card já foi registrado', 'info'); window.postMessage({ src: 'dede-app', type: 'fechou', key, ja: true }, location.origin); return true; }
+    return false;
+  }
+  if (ui.lulu && ui.lulu.key === key && $('#actDlg').open) return true;
+  if (ui.view !== 'atividades') ui.view = 'atividades';
+  render();
+  ui.lulu = { key };
+  openNew(false, d.id);
+  return true;
+}
+window.addEventListener('storage', e => {
+  if (e.key !== KEY || !e.newValue) return;
+  const n = load(); if (!n) return; S = n;
+  if (!$('dialog[open]')) render();
 });
 window.dede = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
 
+$('#actDlg').addEventListener('close', () => { if (ui.lulu) { const k = ui.lulu.key; ui.lulu = null; window.postMessage({ src: 'dede-app', type: 'fechou', key: k }, location.origin); } });
 (function init() { S = load() || normalize({}); save(); bind(); render(); window.postMessage({ src: 'dede-app', type: 'hello' }, location.origin); })();
