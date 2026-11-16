@@ -1639,3 +1639,30 @@ fieldset.cp-grid.dlg .receipt{position:sticky;top:0}
 @media (max-width:860px){ .cards{--cols:minmax(0,1fr) auto auto} }
 .c-actions{gap:3px}
 .c-actions .ab{margin-left:0}
+
+/* ---------- pré-prontos vindos do Lulu ---------- */
+.drafts{margin-top:16px;border-radius:var(--r-lg);background:linear-gradient(180deg,#FFFBEB,#fff 70%);border:1px solid var(--brand-line);box-shadow:var(--sh-1);overflow:hidden;animation:up .45s var(--ease) both}
+.drafts>header{display:flex;align-items:center;gap:12px;padding:14px 16px 12px 18px}
+.drafts>header>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.drafts>header b{font-size:14.5px;font-weight:650;letter-spacing:-.015em}
+.drafts>header span{font-size:12.5px;color:var(--muted)}
+.dr-ico{width:34px;height:34px;border-radius:10px;background:var(--brand);color:var(--ink);display:grid;place-items:center;flex:none;box-shadow:0 8px 18px -10px rgba(245,168,0,.9)}
+.dr-ico .ico{width:18px;height:18px}
+.drafts ul{list-style:none;margin:0;padding:0 8px 8px;display:flex;flex-direction:column;gap:2px;max-height:300px;overflow:auto}
+.drafts li{display:flex;align-items:center;gap:14px;padding:9px 10px;border-radius:12px;cursor:pointer;transition:background .2s var(--ease),transform .2s var(--ease);outline:none}
+.drafts li:hover,.drafts li:focus-visible{background:rgba(253,185,19,.12)}
+.drafts li:active{transform:scale(.995)}
+.dr-when{display:flex;flex-direction:column;align-items:center;min-width:46px;padding:4px 0;border-radius:9px;background:#fff;border:1px solid var(--line-2);line-height:1.15}
+.dr-when b{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.dr-when small{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dr-name{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.dr-name b{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr-name small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr-who{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.dr-go{display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:650;color:#A16207;opacity:.75;transition:opacity .2s,transform .2s var(--ease)}
+.dr-go .ico{width:14px;height:14px}
+.drafts li:hover .dr-go{opacity:1;transform:translateX(2px)}
+.dr-x{width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;flex:none;transition:background .2s,color .2s}
+.dr-x:hover{background:#FEE2E2;color:#B91C1C}
+.ok-t{color:#15803D;font-weight:650}
+@media (max-width:860px){.dr-go{display:none}.drafts>header .btn{display:none}}
