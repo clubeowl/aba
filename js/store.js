@@ -14,7 +14,7 @@ const PALETTE = ['#F5A800', '#FF5A36', '#7B61FF', '#12B886', '#2F80ED', '#E64980
 const BUFF_ON = false;
 
 const DEFAULT_SETTINGS = {
-  pointValue: 3.0, // R$ por ponto
+  pointValue: 2.0, // R$ por ponto
   /* tipo de atividade: a base do card */
   kinds: [
     { id: 'logo',     label: 'Logo / layout',     pts: 1,  color: '#F5A800', hint: 'Logo do cliente nos mockups do boné' },
@@ -82,7 +82,8 @@ function normalize(s) {
   // configurações antigas (itemTypes/tiers) não servem mais: mantém só o valor do ponto
   const settings = {
     ...base,
-    pointValue: typeof st.pointValue === 'number' ? st.pointValue : base.pointValue,
+    // a partir de nov/26 o ponto vale R$ 2,00 por padrão (migra quem ainda estava em 3,00)
+    pointValue: typeof st.pointValue === 'number' && st.pv2 ? st.pointValue : base.pointValue, pv2: true,
     ...(st.kinds ? { kinds: st.kinds } : {}), ...(st.logoQ ? { logoQ: st.logoQ } : {}), ...(st.adds ? { adds: st.adds } : {}),
     ...(st.diffs ? { diffs: st.diffs } : {}), ...(st.buff ? { buff: st.buff } : {}),
   };
@@ -92,6 +93,7 @@ function normalize(s) {
     activities: Array.isArray(s.activities) ? s.activities : [],
     online: s.online && typeof s.online === 'object' ? s.online : {},
     log: Array.isArray(s.log) ? s.log : [],
+    drafts: Array.isArray(s.drafts) ? s.drafts : [],
   };
   // migração dos lançamentos da versão anterior (um tipo por linha)
   out.activities = out.activities.map(a => {
@@ -198,6 +200,26 @@ function receiveFromLulu(payload) {
     if (!who) continue;
     const c = { id: uid(), designerId: who.id, date: dkey(now), time: hm(now), client: String(p.cliente), seller: p.vendedor || '', name: p.nome || '', luluLink: p.link || '', luluId: p.lulu_id ? String(p.lulu_id) : '', kind: p.tipo || 'logo', logoQ: 'alta', adds: { variacao: 0, mud_logo: 0, mud_layout: 0 }, diff: 'moderado', mins: 0, details: 'veio do lulu', status: 'pendente', note: '', createdAt: now.toISOString(), by: 'lulu' };
     c.pts = scoreOf(c).total; S.activities.push(c); out.push(c);
+  }
+  return out;
+}
+
+/* ---------- pré-prontos vindos do Lulu (extensão "Ponte do Lulu") ----------
+   card: { luluId, name, assunto, lead, designer, squad, tipo, concluidoEm }
+   vira um rascunho com nome, dia e hora; o designer completa a pontuação depois.
+   vendedor fica sempre em branco. */
+function addDrafts(cards, fallbackDesigner) {
+  const out = [];
+  for (const c of cards || []) {
+    if (!c || !String(c.name || '').trim()) continue;
+    const key = c.luluId || `${c.name}|${c.concluidoEm}`;
+    if (S.drafts.some(d => d.key === key) || (c.luluId && S.activities.some(a => a.luluId === c.luluId))) { out.push({ key, dup: true }); continue; }
+    const when = c.concluidoEm ? new Date(c.concluidoEm) : new Date();
+    const dn = norm(c.designer).split(/\s+/)[0];
+    const byName = dn && designers().find(p => norm(p.name).split(/\s+/)[0] === dn);
+    const d = { id: uid(), key, luluId: c.luluId || '', name: String(c.name).replace(/\s+/g, ' ').trim(), assunto: c.assunto || '', lead: c.lead || '',
+      designerId: (fallbackDesigner && fallbackDesigner.role === 'designer' ? fallbackDesigner.id : byName ? byName.id : ''), date: dkey(when), time: hm(when), at: new Date().toISOString() };
+    S.drafts.push(d); out.push(d);
   }
   return out;
 }

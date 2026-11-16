@@ -69,6 +69,7 @@ const I = {
   star: '<path d="M12 2l2.9 6.26 6.6.74-4.9 4.6 1.3 6.6L12 17l-5.9 3.2 1.3-6.6L2.5 9l6.6-.74z"/>',
   db: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.7-4 3-9 3s-9-1.3-9-3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
+  lulu: '<path d="M4 7l8-4 8 4-8 4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/>',
   spark: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
 };
 const hint = t => `<i class="hint" tabindex="0" data-tip="${esc(t)}">i</i>`;
@@ -101,7 +102,7 @@ function render() {
   if (!person(ui.meId)) ui.meId = me().id;
   const items = MENU.filter(([v]) => v !== 'config' || isAdmin());
   if (!items.some(i => i[0] === ui.view)) ui.view = 'atividades';
-  const pend = S.activities.filter(a => a.status === 'pendente' && (isAdmin() || a.designerId === me().id)).length;
+  const pend = S.activities.filter(a => a.status === 'pendente' && (isAdmin() || a.designerId === me().id)).length + myDrafts().length;
   $('#nav').innerHTML = items.map(([v, l]) => `<button data-view="${v}" class="${ui.view === v ? 'on' : ''}" aria-label="${l}">${ico(v)}<span class="lbl">${l}</span>${v === 'atividades' && pend ? `<i class="nav-badge">${pend > 99 ? '99+' : pend}</i>` : ''}</button>`).join('') + '<i class="rail-ind"></i>';
   const titles = { atividades: 'Atividades', ranking: 'Ranking', metricas: 'Métricas', config: 'Configurações' };
   const sub = ui.view === 'config' ? 'só a gestão vê' : ui.view === 'ranking' ? rankLabel() : period().label;
@@ -167,11 +168,29 @@ function viewAtividades() {
   const cnt = st => st === 'todas' ? pool.length : pool.filter(a => a.status === st).length;
   return `<section class="page">
     ${summary(ppl, from, to)}
+    ${draftsBox()}
     <div class="filters">
       ${isAdmin() ? `<label class="select-pill">${ico('users')}<select data-who>${[['all', 'Todos os designers'], ...designers().map(p => [p.id, p.name])].map(([v, l]) => `<option value="${v}" ${ui.who === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${ico('chev')}</label>` : ''}
       <label class="search">${ico('search')}<input type="search" placeholder="Buscar card, vendedor…" value="${esc(ui.q)}" data-q></label>
     </div>
     <div id="blocks">${ppl.map((p, i) => block(p, from, to, i)).join('')}</div>
+  </section>`;
+}
+/* pré-prontos vindos do Lulu: nome, dia e hora já vêm; o designer só completa a pontuação */
+const myDrafts = () => S.drafts.filter(d => isAdmin() || !d.designerId || d.designerId === me().id).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+function draftsBox() {
+  const list = myDrafts(); if (!list.length) return '';
+  const admin = isAdmin();
+  return `<section class="drafts" id="drafts">
+    <header><span class="dr-ico">${ico('lulu')}</span><div><b>Do Lulu · aguardando pontuação</b><span>${plural(list.length, 'card concluído', 'cards concluídos')} no Lulu. Clique para completar a pontuação.</span></div>
+      <button class="btn dark sm" data-draft="${list[0].id}">${ico('plus')}Pontuar ${list.length > 1 ? 'o primeiro' : ''}</button></header>
+    <ul>${list.map(d => { const p = person(d.designerId), dt = parseKey(d.date); return `<li data-draft="${d.id}" tabindex="0">
+      <span class="dr-when"><b>${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}</b><small>${esc(d.time)}</small></span>
+      <span class="dr-name"><b>${esc(d.name)}</b><small>${esc(d.assunto || 'card do Lulu')}</small></span>
+      ${admin ? (p ? `<span class="dr-who">${avatar(p, 'sm')}${esc(firstName(p.name))}</span>` : '<span class="dr-who muted">sem designer</span>') : ''}
+      <span class="dr-go">Pontuar${ico('right')}</span>
+      <button class="dr-x" data-draft-del="${d.id}" aria-label="Descartar" data-tip="Descartar">×</button>
+    </li>`; }).join('')}</ul>
   </section>`;
 }
 function renderBlocks() {
@@ -301,13 +320,15 @@ function newDesigner() {
   if (ui.draft && person(ui.draft.designerId)) return ui.draft.designerId;
   return (designers()[0] || {}).id;
 }
-function openNew(fromFab) {
+function openNew(fromFab, draftId) {
   if (!designers().length) return;
-  const admin = isAdmin(), did = newDesigner();
-  const c = ui.draft && ui.draft.designerId === did ? ui.draft : emptyCard(did);
-  actCtx = { mode: 'new' };
+  const admin = isAdmin(), dr = draftId && S.drafts.find(d => d.id === draftId);
+  const did = dr && dr.designerId && person(dr.designerId) ? dr.designerId : (!admin ? me().id : newDesigner());
+  const c = dr ? { ...emptyCard(did), name: dr.name, seller: '', date: dr.date, time: dr.time, luluId: dr.luluId }
+    : ui.draft && ui.draft.designerId === did ? ui.draft : emptyCard(did);
+  actCtx = { mode: 'new', draftId: dr ? dr.id : null };
   $('#actForm').innerHTML = `
-    <header><div class="dlg-title"><span class="q-ico">${ico('plus')}</span><div><h2>Registrar card</h2><p>${admin ? 'Registros feitos pela gestão entram validados.' : 'O registro segue para validação da gestão. A pontuação é calculada automaticamente.'}</p></div></div><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
+    <header><div class="dlg-title"><span class="q-ico">${ico('plus')}</span><div><h2>Registrar card</h2><p>${dr ? 'Veio do Lulu: nome, dia e hora já preenchidos. Complete a pontuação.' : admin ? 'Registros feitos pela gestão entram validados.' : 'O registro segue para validação da gestão. A pontuação é calculada automaticamente.'}</p></div></div><button type="button" class="x" data-close aria-label="Fechar">×</button></header>
     <div class="dlg-body">
       <fieldset class="cp-grid dlg"><div class="cp-fields">${cardFields(c)}</div>${receipt(c)}</fieldset>
       <p class="err" id="actErr" role="alert"></p>
@@ -316,7 +337,8 @@ function openNew(fromFab) {
     <footer><span class="k-hint"><i class="hint-dot">i</i>Pontuação estimada, sujeita à validação da gestão.</span><span class="sp"></span><button type="button" class="btn line" data-close>Cancelar</button><button type="submit" class="btn dark" style="order:2">Registrar</button><button type="submit" class="btn line" name="again" value="1" style="order:1">Registrar e continuar</button></footer>`;
   const dl = $('#actDlg'); if (!dl.open) { dl.classList.toggle('from-fab', !!fromFab); dl.showModal(); }
   $('#actForm').scrollTop = 0;
-  $('#actForm').elements.name.focus();
+  if (dr) { const k = $('#actForm').querySelector('input[name="kind"]:checked') || $('#actForm').querySelector('input[name="kind"]'); k && k.focus(); }
+  else $('#actForm').elements.name.focus();
 }
 function readCard(form) {
   const F = form.elements, adds = {};
@@ -625,6 +647,9 @@ function cfgDados() {
   return `<div class="grid-2">
     <div class="card"><div class="c-head"><h3>Dados</h3><span>modo demonstração · salvos neste navegador</span></div>
       <div class="btns"><button class="btn line" data-io="export">${ico('db')}Exportar .json</button><button class="btn line" data-io="import">Importar</button><button class="btn line" data-io="demo">${ico('spark')}Carregar exemplo</button><button class="btn line danger" data-io="reset">${ico('trash')}Zerar tudo</button></div></div>
+    <div class="card"><div class="c-head"><h3>Ponte do Lulu</h3><span>${document.documentElement.dataset.dedePonte ? '<b class="ok-t">conectada neste navegador</b>' : 'não instalada neste navegador'}</span></div>
+      <p class="muted" style="margin:0 0 12px;font-size:13px;line-height:1.5">Extensão do Chrome: quando o designer confirma <b>Concluído</b> no Pipe Design do Lulu, o card aparece aqui como pré-pronto, já com nome, dia e hora. O vendedor fica em branco.</p>
+      <div class="btns"><a class="btn line" href="tools/dede-ponte-lulu.zip" download>${ico('db')}Baixar extensão</a></div></div>
     <div class="card"><div class="c-head"><h3>Registro da gestão</h3><span>últimas ações</span></div>
       <ul class="log">${S.log.slice(0, 14).map(l => { const d = new Date(l.at); return `<li><span>${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${hm(d)}</span>${esc(l.text)}</li>`; }).join('') || '<li class="muted">nada ainda</li>'}</ul></div>
   </div>`;
@@ -727,6 +752,8 @@ function bind() {
     if ((el = t.closest('[data-step]'))) { const [id, d] = el.dataset.step.split('|'), inp = el.closest('form').elements['add_' + id]; inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + +d); inp.classList.remove('bump'); void inp.offsetWidth; inp.classList.add('bump'); refreshReceipt(el.closest('form')); return; }
     if ((el = t.closest('[data-qt]'))) { const f = el.closest('form'); f.elements.mins.value = toHM(+el.dataset.qt); f.querySelectorAll('.qt').forEach(q => q.classList.toggle('on', q === el)); refreshReceipt(f); return; }
     if (t.closest('dialog')) return;
+    if ((el = t.closest('[data-draft-del]'))) { const d = S.drafts.find(x => x.id === el.dataset.draftDel); if (d && confirm(`Descartar "${d.name}" da lista do Lulu?`)) { S.drafts = S.drafts.filter(x => x !== d); save(); render(); toast('Descartado', 'info'); } return; }
+    if ((el = t.closest('[data-draft]'))) { openNew(false, el.dataset.draft); return; }
     if ((el = t.closest('#nav [data-view]'))) { if (el.dataset.view === 'ranking') ui.day = ui.day || new Date(); go(el.dataset.view); return; }
     if ((el = t.closest('[data-period]'))) { const v = el.dataset.period; if (v !== ui.period) smooth(() => { ui.limit = {}; ui.period = v; }); return; }
     if ((el = t.closest('[data-shift]'))) { const n = +el.dataset.shift; smooth(() => shiftPeriod(n)); return; }
@@ -807,6 +834,7 @@ function bind() {
   });
 
   document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.matches && e.target.matches('li[data-draft]')) { openNew(false, e.target.dataset.draft); return; }
     if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
     if (ui.view === 'config' || !designers().length || $('dialog[open]') || e.target.closest('input, textarea, select, [contenteditable]')) return;
     e.preventDefault(); openNew();
@@ -821,12 +849,15 @@ function bind() {
     e.preventDefault();
     if (actCtx.mode === 'new') {
       const n = saveCardFromForm(e.target, null); if (!n) return;
+      const dr = actCtx.draftId && S.drafts.find(d => d.id === actCtx.draftId);
+      if (dr) { n.luluId = dr.luluId; n.by = 'lulu'; S.drafts = S.drafts.filter(d => d !== dr); }
       ui.flash[n.id] = 'new';
       if (isAdmin()) addLog(`lançou para ${who(n)}: ${n.name} (${fmtPts(n.pts)} pts)`);
       save();
       ui.draft = { ...emptyCard(n.designerId), date: n.date };
       const again = e.submitter && e.submitter.name === 'again';
-      if (again) { render(); openNew(); } else { closeDlg($('#actDlg')); render(); }
+      const next = dr && myDrafts()[0];
+      if (again) { render(); openNew(false, next ? next.id : null); } else { closeDlg($('#actDlg')); render(); }
       toast(`Card registrado · ${fmtPts(n.pts)} pts${isAdmin() ? ' · validado' : ' · em revisão'}`);
       return;
     }
@@ -893,6 +924,16 @@ function io(kind) {
   if (kind === 'reset') { if (!confirm('Zerar tudo? Designers, cards e horas serão apagados.')) return; S = normalize({ settings: S.settings }); ui.meId = 'adm'; localStorage.setItem('dede.me', 'adm'); save(); ui.draft = null; ui.enter = true; render(); return toast('Tudo zerado', 'info'); }
 }
 
+/* ponte com a extensão: ela entrega os cards concluídos no Lulu e a gente confirma o recebimento */
+window.addEventListener('message', e => {
+  if (e.source !== window || !e.data || e.data.src !== 'dede-ponte') return;
+  if (e.data.type === 'fila' && Array.isArray(e.data.cards)) {
+    const got = addDrafts(e.data.cards, me()), novos = got.filter(d => !d.dup);
+    if (novos.length) { save(); render(); toast(novos.length === 1 ? `Do Lulu: ${novos[0].name}` : `${novos.length} cards do Lulu para pontuar`); }
+    window.postMessage({ src: 'dede-app', type: 'ack', keys: got.map(d => d.key) }, location.origin);
+  }
+  if (e.data.type === 'hello') { document.documentElement.dataset.dedePonte = '1'; if (ui.view === 'config' && ui.cfg === 'dados') render(); }
+});
 window.dede = { receberDoLulu: p => { const r = receiveFromLulu(p); save(); render(); return r; } };
 
-(function init() { S = load() || normalize({}); save(); bind(); render(); })();
+(function init() { S = load() || normalize({}); save(); bind(); render(); window.postMessage({ src: 'dede-app', type: 'hello' }, location.origin); })();
