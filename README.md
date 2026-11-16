@@ -48,18 +48,19 @@ Desativado por enquanto. Para religar, troque `BUFF_ON` para `true` no início d
 
 ## Ponte do Lulu (extensão do Chrome)
 
-Quando o designer confirma **Concluído** num card do Pipe Design do Lulu, o card aparece no Dedé em
-"Do Lulu · aguardando pontuação", já com **nome do card, dia e hora**. O vendedor fica em branco.
-É só clicar, marcar a pontuação e registrar.
+Ao dar OK em **Confirmar Concluído** num card do Pipe Design do Lulu, a extensão abre o Dedé numa
+janelinha já no **Registrar card**, com nome do card, dia e hora preenchidos (vendedor em branco).
+O designer marca a pontuação e clica em Registrar: a janela fecha e volta para o Lulu.
+Se fechar sem registrar, o card fica no Dedé em "Do Lulu · aguardando pontuação".
 
 Instalar (uma vez, em cada computador):
 1. Baixe `tools/dede-ponte-lulu.zip` (ou em Configurações → Dados → Baixar extensão) e descompacte.
-2. No Chrome, abra `chrome://extensions`, ligue o **Modo do desenvolvedor**.
+2. No Chrome, abra `chrome://extensions` e ligue o **Modo do desenvolvedor**.
 3. Clique em **Carregar sem compactação** e escolha a pasta descompactada.
+4. **Recarregue (F5) as abas do Lulu que já estavam abertas.**
 
-A extensão só observa o clique no ✓ Concluir / "Confirmar Concluído" e espera o Lulu mostrar
-"Solicitação encerrada". Ela não muda nada no Lulu. Os cards ficam guardados na extensão até o Dedé
-abrir neste mesmo navegador.
+O ícone da extensão mostra os últimos cards capturados e o que ainda falta chegar no Dedé.
+A extensão só observa o Lulu (não clica nem altera nada). Logs no console: filtre por "Dedé ponte".
 
 O ponto vale **R$ 2,00** por padrão (a gestão pode mudar em Configurações → Pontuação).
 
